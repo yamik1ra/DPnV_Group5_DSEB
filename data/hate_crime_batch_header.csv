@@ -1,4 +1,4 @@
-year,record_type,state_code,ori_code,agency_name,agency_type,population_group,country_division,population,agency_status,covered_by_ori,fbi_field_office,judicial_district
+year,record_type,state,ori,agency_name,agency_type,population_group,country_division,population,agency_status,covered_by_ori,fbi_field_office,judicial_district
 2021,BH,50,AK0010100,000000000000,,,AN,CHORAGE,,,,
 2021,BH,50,AK0010200,000000000000        20210,1,01,FA,IRBANKS,,,,
 2021,BH,50,AK0010300,000000000000        20221,0,01,JU,NEAU,,,,
