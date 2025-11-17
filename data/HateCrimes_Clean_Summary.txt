@@ -1,0 +1,21 @@
+FBI HATE CRIME DATA - CLEANING SUMMARY
+================================================================================
+
+Original Records: 46,675
+Final Records: 46,211
+Records Removed: 464
+Date Range: 2021-01-01 00:00:00 to 2024-12-31 00:00:00
+
+Columns: 36
+
+Missing Data Profile:
+  offender_ethnicity: 30,690 (66.41%)
+  offender_race: 19,284 (41.73%)
+  victim_offender_ratio: 18,964 (41.04%)
+  population_category: 15,477 (33.49%)
+  population: 15,477 (33.49%)
+  city: 8,263 (17.88%)
+  agency_type: 1,510 (3.27%)
+  division: 915 (1.98%)
+  population_group: 915 (1.98%)
+  region: 915 (1.98%)
