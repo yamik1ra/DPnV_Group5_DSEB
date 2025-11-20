@@ -128,6 +128,7 @@ UCR_OFFENSE_CODES = {
     '11D': 'Fondling (Indecent Liberties/Child Molestation)',
     # Sex Offenses - Non-forcible
     '36A': 'Incest', '36B': 'Statutory Rape',
+    # Others
     '280': 'Stolen Property Offenses (Receiving, Selling, Etc.)',
     '520': 'Weapon Law Violations',
     '720': 'Animal Cruelty'
@@ -294,12 +295,11 @@ def decode_ir(df):
     # Decode ten-offense group information
     for i in range(1, 11):
         # Decode offense_code (with flexible pattern matching)
-        df[f'ucr_offense_code_{i}'] = df[f'ucr_offense_code_{i}'].apply(decode_offense_flexible)
+        df[f'offense_{i}'] = df[f'ucr_offense_code_{i}'].apply(decode_offense_flexible)
 
         df[f'location_code_{i}'] = df[f'location_code_{i}'].map(LOCATION_CODES)
         # Rename coilumn for clarity
-        df.rename(columns={f'location_code_{i}': f'location_{i}',
-                           f'ucr_offense_code_{i}': f'offense_{i}_cat'}, inplace=True)
+        df.rename(columns={f'location_code_{i}': f'location_{i}'}, inplace=True)
 
         for x in ['a', 'b', 'c', 'd', 'e']:
             df[f'bias_{i}{x}_category'] = df[f'bias_motivation_{i}{x}'].apply(get_bias_category)
