@@ -127,23 +127,81 @@ def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
 def validation(df: pd.DataFrame) -> pd.DataFrame:
     issues = []
 
-    # Fix victim totals
-    if all(c in df.columns for c in ['adult_victims','juvenile_victims','total_victims']):
-        df["computed_victims"] = df["adult_victims"].fillna(0) + df["juvenile_victims"].fillna(0)
-        mismatch = abs(df["computed_victims"] - df["total_victims"].fillna(0)) > 1
-        df.loc[mismatch, "total_victims"] = df.loc[mismatch, "computed_victims"]
-        df = df.drop(columns=["computed_victims"])
+    # ------------------------------------------------------
+    # Victim totals consistency check
+    # ------------------------------------------------------
+    if all(c in df.columns for c in ['adult_victims', 'juvenile_victims', 'total_victims']):
+        df['computed_victims'] = df['adult_victims'].fillna(0) + df['juvenile_victims'].fillna(0)
+        mismatch = abs(df['computed_victims'] - df['total_victims'].fillna(0)) > 1
+        if mismatch.sum() > 0:
+            df.loc[mismatch, 'total_victims'] = df.loc[mismatch, 'computed_victims']
+            issues.append(f"Fixed {mismatch.sum()} victim count mismatches")
+        df = df.drop(columns=['computed_victims'])
 
-    # Fix offender totals
-    if all(c in df.columns for c in ['adult_offenders','juvenile_offenders','total_offenders']):
-        df["computed_off"] = df["adult_offenders"].fillna(0) + df["juvenile_offenders"].fillna(0)
-        mismatch = abs(df["computed_off"] - df["total_offenders"].fillna(0)) > 1
-        df.loc[mismatch, "total_offenders"] = df.loc[mismatch, "computed_off"]
-        df = df.drop(columns=["computed_off"])
+    # ------------------------------------------------------
+    # Offender totals consistency check
+    # ------------------------------------------------------
+    if all(c in df.columns for c in ['adult_offenders', 'juvenile_offenders', 'total_offenders']):
+        df['computed_offenders'] = df['adult_offenders'].fillna(0) + df['juvenile_offenders'].fillna(0)
+        mismatch = abs(df['computed_offenders'] - df['total_offenders'].fillna(0)) > 1
+        if mismatch.sum() > 0:
+            df.loc[mismatch, 'total_offenders'] = df.loc[mismatch, 'computed_offenders']
+            issues.append(f"Fixed {mismatch.sum()} offender count mismatches")
+        df = df.drop(columns=['computed_offenders'])
 
+    # ------------------------------------------------------
     # Remove future dates
-    if "incident_date" in df.columns:
-        df.loc[df["incident_date"] > pd.Timestamp.now(), "incident_date"] = pd.NaT
+    # ------------------------------------------------------
+    if 'incident_date' in df.columns:
+        future_mask = df['incident_date'] > pd.Timestamp.now()
+        if future_mask.sum() > 0:
+            df.loc[future_mask, 'incident_date'] = pd.NaT
+            issues.append(f"Removed {future_mask.sum()} future dates")
+
+    # ------------------------------------------------------
+    # Detect dates older than 2000
+    # ------------------------------------------------------
+    if 'incident_date' in df.columns:
+        old_mask = df['incident_date'] < pd.Timestamp('2000-01-01')
+        if old_mask.sum() > 0:
+            issues.append(f"Found {old_mask.sum()} incidents before year 2000 (verify manually)")
+
+    # ------------------------------------------------------
+    # Year-Month alignment check
+    # ------------------------------------------------------
+    if all(c in df.columns for c in ['incident_date', 'year', 'month']):
+        df['year_check'] = df['incident_date'].dt.year
+        df['month_check'] = df['incident_date'].dt.month
+
+        year_mismatch = (df['year'] != df['year_check'])
+        month_mismatch = (df['month'] != df['month_check'])
+
+        if year_mismatch.sum() > 0 or month_mismatch.sum() > 0:
+            df['year'] = df['year_check']
+            df['month'] = df['month_check']
+            issues.append(
+                f"Fixed {year_mismatch.sum()} year mismatches and {month_mismatch.sum()} month mismatches"
+            )
+
+        df = df.drop(columns=['year_check', 'month_check'])
+
+    # ------------------------------------------------------
+    # Critical missing fields
+    # ------------------------------------------------------
+    critical_fields = ['incident_date', 'bias_category', 'offense_severity']
+    for field in critical_fields:
+        if field in df.columns:
+            missing_count = df[field].isna().sum()
+            if missing_count > 0:
+                issues.append(f"{missing_count} records missing {field}")
+
+    # ------------------------------------------------------
+    # Print summary (optional)
+    # ------------------------------------------------------
+    if len(issues) > 0:
+        print("Issues Found & Fixed:")
+        for issue in issues:
+            print("   -", issue)
 
     return df
 
