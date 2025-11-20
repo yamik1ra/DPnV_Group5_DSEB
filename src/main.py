@@ -10,7 +10,7 @@ Runs full ETL pipeline:
 
 from load_data import load_all_raw
 from decode import decode_all
-from clean_transform import clean_and_merge
+# from clean_transform import clean_and_merge
 
 import warnings
 import pandas as pd
@@ -31,11 +31,11 @@ def main():
     df_ir_dec.to_parquet(PROJECT_ROOT / "data/interim/ir_decoded.parquet", index=False,engine="pyarrow")
     print("🗃️ Decoded files saved!")
 
-    print("\n=== 🧼 STEP 3: Cleaning & transforming data ===")
-    clean_df = clean_and_merge(df_bh_dec, df_ir_dec)
+    # print("\n=== 🧼 STEP 3: Cleaning & transforming data ===")
+    # clean_df = clean_and_merge(df_bh_dec, df_ir_dec)
 
-    clean_df.to_csv(PROJECT_ROOT / "data/processed/hatecrimes_clean.csv", index=False)
-    print("🗃️ Cleaned files saved!")
+    # clean_df.to_csv(PROJECT_ROOT / "data/processed/hatecrimes_clean.csv", index=False)
+    # print("🗃️ Cleaned files saved!")
     
     print("✅ Pipeline completed successfully!")
 

@@ -302,8 +302,8 @@ def decode_ir(df):
                            f'ucr_offense_code_{i}': f'offense_{i}_cat'}, inplace=True)
 
         for x in ['a', 'b', 'c', 'd', 'e']:
-            df[f'bias_motivation_{i}{x}'] = df[f'bias_motivation_{i}{x}'].map(BIAS_MOTIVATION_CODES)
             df[f'bias_{i}{x}_category'] = df[f'bias_motivation_{i}{x}'].apply(get_bias_category)
+            df[f'bias_motivation_{i}{x}'] = df[f'bias_motivation_{i}{x}'].map(BIAS_MOTIVATION_CODES)
         
         # Decode victim types
         df[f'victim_types_{i}'] = df[f'victim_types_{i}'].map(VICTIM_TYPES)
