@@ -13,12 +13,40 @@ Steps:
 '''
 
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from typing import List
 import warnings
 warnings.filterwarnings('ignore')
-import pathlib as Path
+from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+# ------------------------------------------
+# OFFENSE SEVERITY CLASSIFICATION
+# ------------------------------------------
+VIOLENT_OFFENSES = {
+    'Aggravated Assault', 'Murder/Non-negligent Manslaughter',
+    'Negligent Manslaughter', 'Kidnapping/Abduction', 'Robbery',
+    'Rape', 'Sodomy', 'Sexual Assault With An Object', 'Fondling (Indecent Liberties/Child Molestation)'
+}
+
+NON_VIOLENT_EXCEPTIONS = {
+    'Statutory Rape', 'Incest'
+}
+
+def compute_offense_severity(row):
+    """Return violent / non-violent based on decoded offense names."""
+    offenses = [row.get(f"offense_{i}") for i in range(1, 11)]
+    offenses = [o for o in offenses if isinstance(o, str)]
+
+    if any(o in VIOLENT_OFFENSES for o in offenses):
+        return "Violent"
+
+    if any(o in NON_VIOLENT_EXCEPTIONS for o in offenses):
+        return "Non-Violent"
+
+    return "Non-Violent"
+
 
 # ------------------------------------------
 # 1. PLACEHOLDER REPLACEMENT
@@ -34,23 +62,93 @@ def replace_placeholders(df: pd.DataFrame) -> pd.DataFrame:
 # ------------------------------------------
 # 2. DATATYPE CONVERSIONS 
 # ------------------------------------------
-def convert_date(df: pd.DataFrame, date_cols: List[str]) -> pd.DataFrame:
-    '''
+def convert_date(df: pd.DataFrame, date_cols: List[str] = None) -> pd.DataFrame:
+    """
     Convert specified columns to datetime.
-    '''
+    """
+    if date_cols is None:
+        date_cols = [col for col in df.columns if "date" in col.lower()]
+
     for col in date_cols:
-        if 'date' in df.columns:
-            df[col] = pd.to_datetime(df[col], format='%Y%m%d', errors='coerce')
+        df[col] = pd.to_datetime(df[col], errors="coerce")
+
     return df
 
-def convert_numeric(df:pd.DataFrame, numeric_cols: List[str]) -> pd.DataFrame:
-    '''
+
+def convert_numeric(df: pd.DataFrame, numeric_cols: List[str] = None) -> pd.DataFrame:
+    """
     Convert specified columns to numeric.
-    '''
+    """
+    if numeric_cols is None:
+        numeric_cols = [
+            col for col in df.columns 
+            if col.lower().startswith(("num_", "current_", "last_", "population"))
+            or col.lower().endswith(("_count", "_num"))
+            or col in [
+                "total_victims", "adult_victims", "juvenile_victims",
+                "total_offenders", "adult_offenders", "juvenile_offenders"
+            ]
+        ]
+
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
     return df
+
+
+def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
+    placeholders = ['', ' ']
+    string_cols = df.select_dtypes(include=['object']).columns
+
+    for col in string_cols:
+        df[col] = df[col].replace(placeholders, pd.NA)
+
+    # victim/offender negative → NaN
+    victim_offender_cols = [
+        'total_victims','adult_victims','juvenile_victims',
+        'total_offenders','adult_offenders','juvenile_offenders'
+    ]
+    for col in victim_offender_cols:
+        if col in df.columns:
+            df.loc[df[col] < 0, col] = pd.NA
+
+    # offender race/eth → Unknown → NaN
+    for col in ['offender_race','offender_ethnicity']:
+        if col in df.columns:
+            df[col] = df[col].replace(['Unknown','UNKNOWN','U'], pd.NA)
+
+    # population 0 → NaN
+    if "population" in df.columns:
+        df.loc[df["population"] == 0, "population"] = pd.NA
+
+    return df
+
+def validation(df: pd.DataFrame) -> pd.DataFrame:
+    issues = []
+
+    # Fix victim totals
+    if all(c in df.columns for c in ['adult_victims','juvenile_victims','total_victims']):
+        df["computed_victims"] = df["adult_victims"].fillna(0) + df["juvenile_victims"].fillna(0)
+        mismatch = abs(df["computed_victims"] - df["total_victims"].fillna(0)) > 1
+        df.loc[mismatch, "total_victims"] = df.loc[mismatch, "computed_victims"]
+        df = df.drop(columns=["computed_victims"])
+
+    # Fix offender totals
+    if all(c in df.columns for c in ['adult_offenders','juvenile_offenders','total_offenders']):
+        df["computed_off"] = df["adult_offenders"].fillna(0) + df["juvenile_offenders"].fillna(0)
+        mismatch = abs(df["computed_off"] - df["total_offenders"].fillna(0)) > 1
+        df.loc[mismatch, "total_offenders"] = df.loc[mismatch, "computed_off"]
+        df = df.drop(columns=["computed_off"])
+
+    # Remove future dates
+    if "incident_date" in df.columns:
+        df.loc[df["incident_date"] > pd.Timestamp.now(), "incident_date"] = pd.NaT
+
+    return df
+
+
+
 # ------------------------------------------
 # 3. FEATURES ENGINEERING
 # ------------------------------------------
@@ -90,7 +188,12 @@ def add_features_ir(df: pd.DataFrame) -> pd.DataFrame:
     # Replace divide-by-zero or invalid values with NaN
     df['victim_offender_ratio'] = df['victim_offender_ratio'].replace([np.inf, -np.inf], np.nan)
     
-    # 
+    # ---------------------------------
+    # OFFENSE SEVERITY SCORE
+    # ---------------------------------
+    df["offense_severity"] = df.apply(compute_offense_severity, axis=1)
+    df["severity_score"] = df["offense_severity"].map({"Violent": 1, "Non-Violent": 0})
+
     return df
 
 def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
@@ -148,7 +251,7 @@ def clean_bh(df_bh: pd.DataFrame) -> pd.DataFrame:
     df_bh = handle_missing(df_bh)
     df_bh = drop_unnecessary_cols(df_bh, df_type='bh')
     df_bh = df_bh.drop_duplicates()
-    df_bh = df_bh.validation()
+    df_bh = validation(df_bh)
         
     return df_bh
 
@@ -162,8 +265,8 @@ def clean_ir(df_ir: pd.DataFrame) -> pd.DataFrame:
     df_ir = handle_missing(df_ir)
     df_ir = drop_unnecessary_cols(df_ir, df_type='ir')
     df_ir = df_ir.drop_duplicates()
-    df_ir = df_ir.add_features_ir()
-    df_ir = df_ir.validation()
+    df_ir = add_features_ir(df_ir)
+    df_ir = validation(df_ir)
 
     df_ir = df_ir.sort_values(['incident_date', 'ori', 'incident_number'])
 
