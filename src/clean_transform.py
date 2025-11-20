@@ -1,0 +1,384 @@
+'''
+clean_transform.py
+---------------------------------
+Module to clean and transform decoded BH and IR data,
+then merge them into a single clean DataFrame.
+
+Steps:
+- Datatype standardization
+- Missing & placeholder cleanup
+- Categorical normalization
+- Logical integrity checks
+- Feature engineering
+'''
+
+import pandas as pd
+import numpy as np
+from datetime import datetime
+from typing import List
+import warnings
+warnings.filterwarnings('ignore')
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+OFFENSE_SEVERITY_MAP = {
+    # High Severity (Person crimes, immediate threat to life/safety)
+    '09A': 'High', '09B': 'High', '11A': 'High', '11B': 'High', '11C': 'High',
+    '120': 'High', '13A': 'High', '64A': 'High', '64B': 'High', '100': 'High',
+    
+    # Medium Severity (Major property, weapons, severe fraud, severe drugs)
+    '200': 'Medium', '220': 'Medium', '210': 'Medium', '240': 'Medium', 
+    '35A': 'Medium', '520': 'Medium', '26F': 'Medium', '26G': 'Medium', 
+    '26E': 'Medium',
+    
+    # Low Severity (Minor property, public order, simple assault)
+    '13B': 'Low', '13C': 'Low', '510': 'Low', '250': 'Low', '290': 'Low', 
+    '35B': 'Low', '270': 'Low', '26A': 'Low', '26B': 'Low', '26C': 'Low', 
+    '26D': 'Low', '39A': 'Low', '39B': 'Low', '39C': 'Low', '39D': 'Low', 
+    '23A': 'Low', '23B': 'Low', '23C': 'Low', '23D': 'Low', '23E': 'Low', 
+    '23F': 'Low', '23G': 'Low', '23H': 'Low', '370': 'Low', '40A': 'Low', 
+    '40B': 'Low', '40C': 'Low', '11D': 'Low', '36A': 'Low', '36B': 'Low',
+    '280': 'Low', '720': 'Low',
+
+    # Non-Criminal/Informational
+    '09C': 'Non-Criminal'
+}
+
+def replace_placeholders(df: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Replace placeholder values with NaN.
+    '''
+    placeholders = ['', ' ']
+    return df.replace(placeholders, np.nan)
+
+def convert_date(df: pd.DataFrame, date_cols: List[str] = None) -> pd.DataFrame:
+    '''
+    Convert specified columns to datetime.
+    '''
+    if date_cols is None:
+        date_cols = [col for col in df.columns if "date" in col.lower()]
+
+    for col in date_cols:
+        df[col] = pd.to_datetime(df[col], errors="coerce")
+
+    return df
+
+def convert_numeric(df:pd.DataFrame, numeric_cols: List[str]=None) -> pd.DataFrame:
+    '''
+    Convert specified columns to numeric.
+    '''
+    if numeric_cols is None:
+        numeric_cols = [
+            col for col in df.columns 
+            if col.lower().startswith(("num_", "current_", "last_", "population"))
+            or col.lower().endswith(("_count", "_num"))
+            or col in [
+                "total_victims", "num_adult_victims", "num_juvenile_victims",
+                "total_offenders", "num_adult_offenders", "num_juvenile_offenders"
+            ]
+        ]
+
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    
+    return df
+
+def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
+    # victim/offender: negative → NA
+    victim_offender_cols = [
+        'total_victims','num_adult_victims','num_juvenile_victims',
+        'total_offenders','num_adult_offenders','num_juvenile_offenders'
+    ]
+    for col in victim_offender_cols:
+        if col in df.columns:
+            df.loc[df[col] < 0, col] = np.nan
+
+    # offender race/ethnicity: Unknown → NaN
+    for col in ['offender_race','offender_ethnicity']:
+        if col in df.columns:
+            df[col] = df[col].replace('Unknown', np.nan)
+
+    # population <= 0 should means missing information
+    for col in ['current_population', 'last_population']:    
+        if col in df.columns:
+            df.loc[df[col] <= 0, col] = np.nan
+
+    return df
+
+def validate(df: pd.DataFrame) -> pd.DataFrame:
+    issues = []
+
+    # ------------------------------------------------------
+    # Victim totals consistency check
+    # ------------------------------------------------------
+    if all(c in df.columns for c in ['num_adult_victims', 'num_juvenile_victims', 'total_victims']):
+        calculated_total = (df['num_adult_victims'].fillna(0) + df['num_juvenile_victims'].fillna(0))
+        reported_total = df['total_victims'].fillna(0)
+        
+        mismatch_mask = (calculated_total != reported_total)
+        mismatch_count = mismatch_mask.sum()
+
+        if mismatch_count > 0:
+            df.loc[mismatch_mask, 'total_victims'] = calculated_total[mismatch_mask]
+            issues.append(f"Fixed {mismatch_count} victim count mismatches.")
+    
+    # ------------------------------------------------------
+    # Offender totals consistency check
+    # ------------------------------------------------------
+    if all(c in df.columns for c in ['num_adult_offenders', 'num_juvenile_offenders', 'total_offenders']):
+        calculated_total = (df['adult_offenders'].fillna(0) + df['juvenile_offenders'].fillna(0))
+        reported_total = df['total_offenders'].fillna(0)
+
+        mismatch_mask = (calculated_total != reported_total)
+        mismatch_count = mismatch_mask.sum()
+
+        if mismatch_count > 0:
+            df.loc[mismatch_mask, 'total_offenders'] = calculated_total[mismatch_mask]
+            issues.append(f"Fixed {mismatch_count} offender count mismatches.")
+    
+    # ------------------------------------------------------
+    # Remove future dates
+    # ------------------------------------------------------
+    if 'incident_date' in df.columns:
+        future_mask = df['incident_date'] > pd.Timestamp.now()
+        if future_mask.sum() > 0:
+            df.loc[future_mask, 'incident_date'] = pd.NaT
+            issues.append(f"Removed {future_mask.sum()} future dates.")
+    
+    # ------------------------------------------------------
+    # Detect dates older than 2021
+    # ------------------------------------------------------
+    if 'incident_date' in df.columns:
+        old_mask = df['incident_date'] < pd.Timestamp('2021-01-01')
+        if old_mask.sum() > 0:
+            issues.append(f"Found {old_mask.sum()} incidents before year 2021.")
+    
+    # ------------------------------------------------------
+    # Year-Month alignment check
+    # ------------------------------------------------------
+    if all(c in df.columns for c in ['incident_date', 'year', 'month']):
+        df['year_check'] = df['incident_date'].dt.year.astype('Int64', errors='ignore')
+        df['month_check'] = df['incident_date'].dt.month.astype('Int64', errors='ignore')
+
+        # Ensure 'year' and 'month' columns are numeric
+        df['year'] = pd.to_numeric(df['year'], errors='coerce').astype('Int64', errors='ignore')
+        df['month'] = pd.to_numeric(df['month'], errors='coerce').astype('Int64', errors='ignore')
+
+        year_mismatch = (df['year'] != df['year_check'])
+        month_mismatch = (df['month'] != df['month_check'])
+        total_mismatch = year_mismatch | month_mismatch
+
+        if total_mismatch.any():
+            df.loc[total_mismatch, 'year'] = df.loc[total_mismatch, 'year_check']
+            df.loc[total_mismatch, 'month'] = df.loc[total_mismatch, 'month_check']
+        
+            issues.append(
+                f"Fixed {year_mismatch.sum()} year mismatches and {month_mismatch.sum()} month mismatches."
+            )
+
+        df = df.drop(columns=['year_check', 'month_check'])
+
+    return df
+
+def add_features_bh(df: pd.DataFrame)-> pd.DataFrame:
+    # ---------------------------------
+    # Total POPULATION the agency is responsible for
+    # ---------------------------------
+    current_pop_cols = df.filter(regex=r'^current_population_\d+$')
+    last_pop_cols = df.filter(regex=r'^last_population_\d+$')
+    
+    df['current_population'] = current_pop_cols.sum(axis=1)
+    df['last_population'] = last_pop_cols.sum(axis=1)
+
+    return df
+
+def add_features_ir(df: pd.DataFrame) -> pd.DataFrame:
+    # ---------------------------------
+    # TEMPORAL FEATURES
+    # ---------------------------------
+    if 'incident_date' in df.columns:
+        date = df['incident_date']
+
+        df['year'] = date.dt.year
+        df['month'] = date.dt.month
+        df["quarter"] = "Q" + date.dt.quarter.astype(str)
+        df["day_of_week"] = date.dt.day_name()
+        df["is_weekend"] = date.dt.dayofweek.isin([5, 6])
+        df["day_of_year"] = date.dt.dayofyear
+    else:
+        raise KeyError("⚠️ Column 'incident_date' is missing from the dataframe.")
+
+    # ---------------------------------
+    # VICTIM / OFFENDER FEATURES
+    # ---------------------------------
+    required_cols = [
+        "num_adult_victims", "num_juvenile_victims",
+        "num_adult_offenders", "num_juvenile_offenders"
+    ]
+    missing = [col for col in required_cols if col not in df.columns]
+    if missing:
+        raise KeyError(f"Missing required columns for ratio computation: {missing}")
+
+    df['total_victims'] = df['num_adult_victims'].fillna(0) + df['num_juvenile_victims'].fillna(0)
+    df['total_offenders'] = df['num_adult_offenders'].fillna(0) + df['num_juvenile_offenders'].fillna(0)
+    
+    df['victim_offender_ratio'] = df['total_victims'] / df['total_offenders']
+    # Replace divide-by-zero or invalid values with NaN
+    df['victim_offender_ratio'] = df['victim_offender_ratio'].replace([np.inf, -np.inf], np.nan)
+    
+    # ---------------------------------
+    # OFFENSE SEVERITY
+    # ---------------------------------
+    for i in range(1, 11):
+        offense_col = f'ucr_offense_code_{i}'
+        severity_col = f'offense_{i}_severity'
+
+        if offense_col in df.columns:
+            df[severity_col] = df[offense_col].map(OFFENSE_SEVERITY_MAP)
+
+    return df
+
+def cleanup_unused_offense_cols(df: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Identifies and removes offense-related columns (offense_i, num_victims_i, 
+    victim_types_i, location_i for i = 1 to 10) that contain only missing data (NaN).
+    '''
+    all_offense_columns = []
+    for i in range(1, 11):
+        all_offense_columns.extend([
+            f"offense_{i}", f'offense_{i}_severity', f"num_victims_{i}", f"victim_types_{i}", f"location_{i}"
+        ])
+        for suffix in ['a', 'b', 'c', 'd', 'e']:
+            all_offense_columns.extend([
+                f"bias_motivation_{i}{suffix}", f"bias_{i}{suffix}_category"
+            ])
+    
+    existing_offense_columns = [col for col in all_offense_columns if col in df.columns]
+    columns_to_drop = []
+
+    for col in existing_offense_columns:
+        if df[col].isnull().all():
+            columns_to_drop.append(col)
+
+    if columns_to_drop:
+        print(f"Dropping {len(columns_to_drop)} completely empty offense columns: {columns_to_drop}")
+        df = df.drop(columns=columns_to_drop)
+    else:
+        print("No completely empty offense columns found to drop.")
+        
+    return df
+
+def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
+    bh_cols_to_keep = ['ori', 'state_code', 'state_abbr', 'state_name', 
+                        'agency_name', 'agency_type', 'date_ori_went_nibrs', 'master_file_year',
+                        'city_name', 'is_core_city', 'population_group',
+                        'country_division', 'country_region',
+                        'current_population', 'last_population',
+                        'state_q1_activity', 'state_q2_activity', 'state_q3_activity', 'state_q4_activity', 
+                        'federal_q1_activity', 'federal_q2_activity', 'federal_q3_activity', 'federal_q4_activity', 
+                        'fips_counties_1', 'fips_counties_2', 'fips_counties_3', 'fips_counties_4', 'fips_counties_5',
+                        '_bh_index' ]
+    ir_cols_to_keep = ['bh_index','ori', 'incident_number', 'incident_date',
+                        'data_source', 'year', 'quarter', 'month', 'day_of_week', 'is_weekend', 
+                        'total_victims', 'num_adult_victims', 'num_juvenile_victims',
+                        'total_offenders', 'num_adult_offenders', 'num_juvenile_offenders',
+                        'victim_offender_ratio',
+                        'offender_race', 'offender_ethnicity',
+                        ]
+    # Expand offense fields automatically
+    for i in range(1, 11):
+        ir_cols_to_keep.extend([
+            f"offense_{i}", f'offense_{i}_severity', f"num_victims_{i}", f"victim_types_{i}", f"location_{i}"
+        ])
+        for suffix in ['a', 'b', 'c', 'd', 'e']:
+            ir_cols_to_keep.extend([
+                f"bias_motivation_{i}{suffix}", f"bias_{i}{suffix}_category"
+            ])
+    
+    if df_type == 'bh':
+        df = df.dropna(axis=1, how='all')
+        keep = bh_cols_to_keep
+    elif df_type == "ir":
+        df = cleanup_unused_offense_cols(df)
+        keep = ir_cols_to_keep
+    else:
+        raise ValueError("df_type must be either 'bh' or 'ir'")
+    
+    keep = [col for col in keep if col in df.columns]
+
+    return df[keep]
+
+# ------------------------------------------
+#   BH & IR SPECIFIC CLEANING FUNCTIONS
+# ------------------------------------------
+
+def clean_bh(df_bh: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Clean the BH dataframe.
+    '''
+    df_bh = replace_placeholders(df_bh)
+    df_bh = convert_date(df_bh)
+    df_bh = convert_numeric(df_bh)
+    df_bh = handle_missing(df_bh)
+    df_bh = validate(df_bh)
+    df_bh = add_features_bh(df_bh)
+    df_bh = drop_unnecessary_cols(df_bh, df_type='bh')
+    df_bh = df_bh.drop_duplicates(ignore_index=True)
+    df_bh = df_bh.set_index('_bh_index')
+        
+    return df_bh
+
+def clean_ir(df_ir: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Clean and transform the IR dataframe.
+    '''
+    df_ir = replace_placeholders(df_ir)
+    df_ir = convert_date(df_ir)
+    df_ir = convert_numeric(df_ir)
+    df_ir = handle_missing(df_ir)
+    df_ir = validate(df_ir)
+    df_ir = add_features_ir(df_ir)
+    df_ir = drop_unnecessary_cols(df_ir, df_type='ir')
+    df_ir = df_ir.drop_duplicates(ignore_index=True)
+
+    df_ir = df_ir.sort_values(['incident_date', 'ori', 'incident_number'])
+
+    return df_ir
+
+# ------------------------------------------
+#   MERGE BH + IR
+# ------------------------------------------
+
+def merge_bh_ir(df_bh: pd.DataFrame, df_ir: pd.DataFrame) -> pd.DataFrame:
+    
+    clean_df = df_ir.merge(
+        df_bh, left_on='bh_index',
+        right_index=True,
+        how='left',
+        suffixes=('', '_agency')
+    )
+    return clean_df
+
+# ------------------------------------------
+#   MAIN PIPELINE FUNCTION
+# ------------------------------------------
+
+def clean_and_merge(df_bh: pd.DataFrame, df_ir: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Run the entire cleaning + merging pipeline.
+    Produces: clean_df (ready for EDA / visualization / modeling)
+    '''
+    print("🧼 Cleaning BH dataframe...")
+    df_bh_clean = clean_bh(df_bh)
+
+    print("🧼 Cleaning IR dataframe...")
+    df_ir_clean = clean_ir(df_ir)
+
+    print("🔗 Merging BH + IR dataframes...")
+    clean_df = merge_bh_ir(df_bh_clean, df_ir_clean)
+
+    return clean_df
+
+if __name__ == '__main__':
+    print("This module is intended to be imported by main.py, not run directly.")
