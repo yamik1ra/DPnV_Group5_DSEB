@@ -324,7 +324,6 @@ def clean_bh(df_bh: pd.DataFrame) -> pd.DataFrame:
     df_bh = validate(df_bh)
     df_bh = add_features_bh(df_bh)
     df_bh = drop_unnecessary_cols(df_bh, df_type='bh')
-    df_bh = df_bh.drop_duplicates(ignore_index=True)
     df_bh = df_bh.set_index(['file_id', 'bh_index'])
         
     return df_bh
@@ -340,7 +339,6 @@ def clean_ir(df_ir: pd.DataFrame) -> pd.DataFrame:
     df_ir = validate(df_ir)
     df_ir = add_features_ir(df_ir)
     df_ir = drop_unnecessary_cols(df_ir, df_type='ir')
-    df_ir = df_ir.drop_duplicates(ignore_index=True)
     df_ir = df_ir.set_index(['file_id', 'bh_index'])
 
     df_ir = df_ir.sort_values(['incident_date', 'ori', 'incident_number'])
@@ -381,6 +379,8 @@ def clean_and_merge(df_bh: pd.DataFrame, df_ir: pd.DataFrame) -> pd.DataFrame:
 
     print("🔗 Merging BH + IR dataframes...")
     clean_df = merge_bh_ir(df_bh_clean, df_ir_clean)
+    clean_df = clean_df.reset_index()
+    clean_df = clean_df.drop_duplicates(ignore_index=True)
 
     return clean_df
 
