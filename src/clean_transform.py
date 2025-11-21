@@ -7,7 +7,6 @@ then merge them into a single clean DataFrame.
 Steps:
 - Datatype standardization
 - Missing & placeholder cleanup
-- Categorical normalization
 - Logical integrity checks
 - Feature engineering
 '''
@@ -106,6 +105,40 @@ def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+def handle_incident_number_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Checks for duplicate incident numbers. 
+    If found, check if they occur within the same agency (ORI). 
+    If not so, merge ORI and incident_number to create a new unique identifier.
+    """
+    if 'incident_number' not in df.columns or 'ori' not in df.columns:
+        return df
+
+    # Check: Global duplicate incident numbers
+    duplicate_global_mask = df['incident_number'].duplicated(keep=False)
+    global_duplicate_count = duplicate_global_mask.sum()
+
+    if global_duplicate_count == 0:
+        return df
+    else:
+        # Check: Duplicate incident numbers within the same agency (ORI)
+        # but the rows themselves are not exact duplicates.
+        agency_duplicate_mask = (
+            df.duplicated(subset=['ori', 'incident_number'], keep=False)
+            &
+            (~df.duplicated(keep=False)) 
+        )
+        agency_duplicate_count = agency_duplicate_mask.sum()
+
+        if agency_duplicate_count == 0: 
+            # Create a unique incident identifier by combining ORI and incident_number
+            df['incident_number'] = df['ori'].astype(str) + '-' + df['incident_number'].astype(str)
+
+        else:
+            print('⚠️ Warning: Conflicting records for the same (ori, incident_number). Please review manually.')
+        
+        return df
+
 def validate(df: pd.DataFrame) -> pd.DataFrame:
     issues = []
 
@@ -127,7 +160,7 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
     # Offender totals consistency check
     # ------------------------------------------------------
     if all(c in df.columns for c in ['num_adult_offenders', 'num_juvenile_offenders', 'total_offenders']):
-        calculated_total = (df['adult_offenders'].fillna(0) + df['juvenile_offenders'].fillna(0))
+        calculated_total = (df['num_adult_offenders'].fillna(0) + df['num_juvenile_offenders'].fillna(0))
         reported_total = df['total_offenders'].fillna(0)
 
         mismatch_mask = (calculated_total != reported_total)
@@ -279,13 +312,13 @@ def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
                         'federal_q1_activity', 'federal_q2_activity', 'federal_q3_activity', 'federal_q4_activity', 
                         'fips_counties_1', 'fips_counties_2', 'fips_counties_3', 'fips_counties_4', 'fips_counties_5',
                         'bh_index', 'file_id']
-    ir_cols_to_keep = ['file_id', 'bh_index','ori', 'incident_number', 'incident_date',
+    ir_cols_to_keep = [ 'ori', 'incident_number', 'incident_date',
                         'data_source', 'year', 'quarter', 'month', 'day_of_week', 'is_weekend', 
                         'total_victims', 'num_adult_victims', 'num_juvenile_victims',
                         'total_offenders', 'num_adult_offenders', 'num_juvenile_offenders',
                         'victim_offender_ratio',
                         'offender_race', 'offender_ethnicity',
-                        ]
+                        'file_id', 'bh_index']
     # Expand offense fields automatically
     for i in range(1, 11):
         ir_cols_to_keep.extend([
@@ -317,6 +350,7 @@ def clean_bh(df_bh: pd.DataFrame) -> pd.DataFrame:
     '''
     Clean the BH dataframe.
     '''
+    
     df_bh = replace_placeholders(df_bh)
     df_bh = convert_date(df_bh)
     df_bh = convert_numeric(df_bh)
@@ -336,6 +370,7 @@ def clean_ir(df_ir: pd.DataFrame) -> pd.DataFrame:
     df_ir = convert_date(df_ir)
     df_ir = convert_numeric(df_ir)
     df_ir = handle_missing(df_ir)
+    df_ir = handle_incident_number_duplicates(df_ir)
     df_ir = validate(df_ir)
     df_ir = add_features_ir(df_ir)
     df_ir = drop_unnecessary_cols(df_ir, df_type='ir')
