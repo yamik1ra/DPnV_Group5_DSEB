@@ -8,6 +8,7 @@ Usage:
     df_bh_dec, df_ir_dec = decode_all(df_bh, df_ir)
 """
 import pandas as pd
+import numpy as np
 
 # ----------------------------------------------------
 # DICTIONARIES FOR DECODING
@@ -225,6 +226,22 @@ ACTIVITY_CODES = {
 # ----------------------------------------------------
 # HELPER FUNCTIONS
 # ----------------------------------------------------
+def decode_judicial_district(val):
+    if pd.isna(val):
+        return np.nan
+    
+    val = str(val).strip()
+    
+    # Handle missing code "0000"
+    if val == "0000":
+        return np.nan
+    
+    # Extract last character
+    region_code = val[-1].upper()
+
+    # Map the region
+    return JUDICIAL_REGION.get(region_code, np.nan)
+
 def decode_bh(df):
     """Decode all coded fields to human-readable text in Batch Header DataFrame."""
     df = df.copy()
@@ -239,7 +256,7 @@ def decode_bh(df):
     df['country_division'] = df['country_division'].map(
         lambda x: COUNTRY_DIVISIONS.get(x, ('Unknown', []))[0]
     )
-    df['judicial_district'] = df['judicial_district'].map(JUDICIAL_REGION)
+    df['judicial_district'] = df['judicial_district'].apply(decode_judicial_district)
     
     # Decode agency
     df['agency_indicator'] = df['agency_indicator'].map(AGENCY_INDICATORS)
