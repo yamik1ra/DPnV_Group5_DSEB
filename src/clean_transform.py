@@ -273,7 +273,7 @@ def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
     bh_cols_to_keep = ['ori', 'state_code', 'state_abbr', 'state_name', 
                         'agency_name', 'agency_type', 'date_ori_went_nibrs', 'master_file_year',
                         'city_name', 'is_core_city', 'population_group',
-                        'country_division', 'country_region',
+                        'country_division', 'country_region', 'judicial_dítrict',
                         'current_population', 'last_population',
                         'state_q1_activity', 'state_q2_activity', 'state_q3_activity', 'state_q4_activity', 
                         'federal_q1_activity', 'federal_q2_activity', 'federal_q3_activity', 'federal_q4_activity', 
