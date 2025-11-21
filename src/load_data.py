@@ -186,10 +186,10 @@ def load_all_raw(data_folder=PROJECT_ROOT / 'data' / 'raw'):
     Returns df_bh, df_ir as DataFrames.
     """
     file_patterns = {
-        2021: "2021_HC_NATIONAL_MASTER_FILE.txt",
-        2022: "2022_HC_NATIONAL_MASTER_FILE.txt",
-        2023: "2023_HC_NATIONAL_MASTER_FILE.txt",
-        2024: "2024_HC_NATIONAL_MASTER_FILE.txt",
+        '2021': "2021_HC_NATIONAL_MASTER_FILE.txt",
+        '2022': "2022_HC_NATIONAL_MASTER_FILE.txt",
+        '2023': "2023_HC_NATIONAL_MASTER_FILE.txt",
+        '2024': "2024_HC_NATIONAL_MASTER_FILE.txt",
     }
 
     all_bh = []
