@@ -153,7 +153,7 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
         old_mask = df['incident_date'] < pd.Timestamp('2021-01-01')
         if old_mask.sum() > 0:
             issues.append(f"Found {old_mask.sum()} incidents before year 2021.")
-    
+
     # ------------------------------------------------------
     # Year-Month alignment check
     # ------------------------------------------------------
@@ -278,8 +278,8 @@ def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
                         'state_q1_activity', 'state_q2_activity', 'state_q3_activity', 'state_q4_activity', 
                         'federal_q1_activity', 'federal_q2_activity', 'federal_q3_activity', 'federal_q4_activity', 
                         'fips_counties_1', 'fips_counties_2', 'fips_counties_3', 'fips_counties_4', 'fips_counties_5',
-                        '_bh_index' ]
-    ir_cols_to_keep = ['bh_index','ori', 'incident_number', 'incident_date',
+                        'bh_index', 'file_id']
+    ir_cols_to_keep = ['file_id', 'bh_index','ori', 'incident_number', 'incident_date',
                         'data_source', 'year', 'quarter', 'month', 'day_of_week', 'is_weekend', 
                         'total_victims', 'num_adult_victims', 'num_juvenile_victims',
                         'total_offenders', 'num_adult_offenders', 'num_juvenile_offenders',
@@ -325,7 +325,7 @@ def clean_bh(df_bh: pd.DataFrame) -> pd.DataFrame:
     df_bh = add_features_bh(df_bh)
     df_bh = drop_unnecessary_cols(df_bh, df_type='bh')
     df_bh = df_bh.drop_duplicates(ignore_index=True)
-    df_bh = df_bh.set_index('_bh_index')
+    df_bh = df_bh.set_index(['file_id', 'bh_index'])
         
     return df_bh
 
@@ -341,6 +341,7 @@ def clean_ir(df_ir: pd.DataFrame) -> pd.DataFrame:
     df_ir = add_features_ir(df_ir)
     df_ir = drop_unnecessary_cols(df_ir, df_type='ir')
     df_ir = df_ir.drop_duplicates(ignore_index=True)
+    df_ir = df_ir.set_index(['file_id', 'bh_index'])
 
     df_ir = df_ir.sort_values(['incident_date', 'ori', 'incident_number'])
 
@@ -351,9 +352,12 @@ def clean_ir(df_ir: pd.DataFrame) -> pd.DataFrame:
 # ------------------------------------------
 
 def merge_bh_ir(df_bh: pd.DataFrame, df_ir: pd.DataFrame) -> pd.DataFrame:
-    
+    """
+    Merge IR and BH data using MultiIndex (file_id, bh_index)
+    """
     clean_df = df_ir.merge(
-        df_bh, left_on='bh_index',
+        df_bh, 
+        left_index=True,
         right_index=True,
         how='left',
         suffixes=('', '_agency')

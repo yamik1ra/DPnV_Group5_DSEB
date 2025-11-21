@@ -126,7 +126,7 @@ def get_field(line: str, start: int, end: int) -> str:
         return line[start-1:].rstrip('\n').strip()
     return line[start-1:end].strip()
 
-def load_single_file(file_path):
+def load_single_file(file_path, file_id):
     """
     Parse a single FBI fixed-width file.
     Returns (list_of_bh_records, list_of_ir_records).
@@ -157,10 +157,11 @@ def load_single_file(file_path):
                     name: get_field(line, start, end)
                     for start, end, name in bh_specs
                 }
-                bh_data["_bh_index"] = len(bh_records)
+                bh_data["bh_index"] = len(bh_records)
+                bh_data['file_id'] = file_id
                 bh_records.append(bh_data)
 
-                current_bh_index = bh_data["_bh_index"]
+                current_bh_index = bh_data["bh_index"]
                 file_bh_count += 1
             
             # ---- IR Record ----
@@ -170,6 +171,7 @@ def load_single_file(file_path):
                     for start, end, name in ir_specs
                 }
                 ir_data["bh_index"] = current_bh_index  # link to BH
+                ir_data['file_id'] = file_id
                 ir_data["_ir_line_no"] = lineno
                 ir_records.append(ir_data)
 
@@ -183,19 +185,19 @@ def load_all_raw(data_folder=PROJECT_ROOT / 'data' / 'raw'):
     Load BH + IR records from all 4 year files (2021-2024).
     Returns df_bh, df_ir as DataFrames.
     """
-    file_patterns = [
-        "2021_HC_NATIONAL_MASTER_FILE.txt",
-        "2022_HC_NATIONAL_MASTER_FILE.txt",
-        "2023_HC_NATIONAL_MASTER_FILE.txt",
-        "2024_HC_NATIONAL_MASTER_FILE.txt",
-    ]
-    
+    file_patterns = {
+        2021: "2021_HC_NATIONAL_MASTER_FILE.txt",
+        2022: "2022_HC_NATIONAL_MASTER_FILE.txt",
+        2023: "2023_HC_NATIONAL_MASTER_FILE.txt",
+        2024: "2024_HC_NATIONAL_MASTER_FILE.txt",
+    }
+
     all_bh = []
     all_ir = []
 
-    for file_path in file_patterns:
-        fp = Path(data_folder) / file_path
-        bh_records, ir_records = load_single_file(fp)
+    for year, file_name in file_patterns.items():
+        fp = Path(data_folder) / file_name
+        bh_records, ir_records = load_single_file(fp, file_id=year)
         all_bh.extend(bh_records)
         all_ir.extend(ir_records)
 
