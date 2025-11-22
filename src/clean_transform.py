@@ -273,6 +273,18 @@ def add_features_ir(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+def drop_zero_variance_cat(df: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Remove categorical columns with zero variance
+    '''
+    cat_cols = df.select_dtypes(include='object').columns
+
+    zero_var_cols = [col for col in cat_cols if df[col].nunique(dropna=True) <= 1]
+
+    cleaned_df = df.drop(columns=zero_var_cols)
+
+    return cleaned_df
+
 def cleanup_unused_offense_cols(df: pd.DataFrame) -> pd.DataFrame:
     '''
     Identifies and removes offense-related columns (offense_i, num_victims_i, 
@@ -332,6 +344,7 @@ def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
     
     if df_type == 'bh':
         df = df.dropna(axis=1, how='all')
+        df = drop_zero_variance_cat(df)
         keep = bh_cols_to_keep
     elif df_type == "ir":
         df = cleanup_unused_offense_cols(df)
