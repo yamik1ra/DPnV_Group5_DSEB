@@ -99,7 +99,8 @@ def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].replace('Unknown', np.nan)
 
     # population <= 0 should means missing information
-    for col in ['current_population', 'last_population']:    
+    pop_cols = df.filter(regex=r'^(current|last)_population_\d+$').columns.tolist()
+    for col in pop_cols:    
         if col in df.columns:
             df.loc[df[col] <= 0, col] = np.nan
 
@@ -221,8 +222,8 @@ def add_features_bh(df: pd.DataFrame)-> pd.DataFrame:
     current_pop_cols = df.filter(regex=r'^current_population_\d+$')
     last_pop_cols = df.filter(regex=r'^last_population_\d+$')
     
-    df['current_population'] = current_pop_cols.sum(axis=1)
-    df['last_population'] = last_pop_cols.sum(axis=1)
+    df['current_population'] = current_pop_cols.sum(axis=1, min_count=1)
+    df['last_population'] = last_pop_cols.sum(axis=1, min_count=1)
 
     return df
 
