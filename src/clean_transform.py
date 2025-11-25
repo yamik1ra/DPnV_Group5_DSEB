@@ -95,7 +95,7 @@ def convert_numeric(df:pd.DataFrame, numeric_cols: List[str]=None) -> pd.DataFra
     if numeric_cols is None:
         numeric_cols = [
             col for col in df.columns 
-            if col.lower().startswith(("num_", "current_", "last_", "population"))
+            if col.lower().startswith(("num_", "current_", "last_"))
             or col.lower().endswith(("_count", "_num"))
             or col in [
                 "total_victims", "num_adult_victims", "num_juvenile_victims",
