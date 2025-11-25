@@ -43,6 +43,32 @@ OFFENSE_SEVERITY_MAP = {
     '09C': 'Non-Criminal'
 }
 
+bh_cols_to_keep = ['ori', 'state_code', 'state_abbr', 'state_name', 
+                    'agency_name', 'agency_type', 'date_ori_went_nibrs', 'master_file_year',
+                    'city_name', 'is_core_city', 'population_group',
+                    'country_division', 'country_region', 'judicial_district',
+                    'current_population', 'last_population',
+                    'state_q1_activity', 'state_q2_activity', 'state_q3_activity', 'state_q4_activity', 
+                    'federal_q1_activity', 'federal_q2_activity', 'federal_q3_activity', 'federal_q4_activity', 
+                    'fips_counties_1', 'fips_counties_2', 'fips_counties_3', 'fips_counties_4', 'fips_counties_5',
+                    'bh_index', 'file_id']
+ir_cols_to_keep = [ 'ori', 'incident_number', 'incident_date',
+                    'data_source', 'year', 'quarter', 'month', 'day_of_week', 'is_weekend', 
+                    'total_victims', 'num_adult_victims', 'num_juvenile_victims',
+                    'total_offenders', 'num_adult_offenders', 'num_juvenile_offenders',
+                    'victim_offender_ratio',
+                    'offender_race', 'offender_ethnicity',
+                    'file_id', 'bh_index']
+# Expand offense fields automatically
+for i in range(1, 11):
+    ir_cols_to_keep.extend([
+        f"offense_{i}", f'offense_{i}_severity', f"num_victims_{i}", f"victim_types_{i}", f"location_{i}"
+    ])
+    for suffix in ['a', 'b', 'c', 'd', 'e']:
+        ir_cols_to_keep.extend([
+            f"bias_motivation_{i}{suffix}", f"bias_{i}{suffix}_category"
+        ])
+
 def replace_placeholders(df: pd.DataFrame) -> pd.DataFrame:
     '''
     Replace placeholder values with NaN.
@@ -58,7 +84,7 @@ def convert_date(df: pd.DataFrame, date_cols: List[str] = None) -> pd.DataFrame:
         date_cols = [col for col in df.columns if "date" in col.lower()]
 
     for col in date_cols:
-        df[col] = pd.to_datetime(df[col], errors="coerce")
+        df[col] = pd.to_datetime(df[col], format='%Y%m%d', errors="coerce")
 
     return df
 
@@ -136,7 +162,14 @@ def handle_incident_number_duplicates(df: pd.DataFrame) -> pd.DataFrame:
             df['incident_number'] = df['ori'].astype(str) + '-' + df['incident_number'].astype(str)
 
         else:
-            print('⚠️ Warning: Conflicting records for the same (ori, incident_number). Please review manually.')
+            print('⚠️ Warning: Conflicting records for the same (ori, incident_number). Appending unqiue suffix.')
+            
+            # Create a deduplicated ID by appending a counter
+            df['incident_number'] = (
+                df['ori'].astype(str) + '-' +
+                df['incident_number'].astype(str) + '-' +
+                df.groupby(['ori', 'incident_number']).cumcount().astype(str)
+            )
         
         return df
 
@@ -188,31 +221,6 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
         if old_mask.sum() > 0:
             issues.append(f"Found {old_mask.sum()} incidents before year 2021.")
 
-    # ------------------------------------------------------
-    # Year-Month alignment check
-    # ------------------------------------------------------
-    if all(c in df.columns for c in ['incident_date', 'year', 'month']):
-        df['year_check'] = df['incident_date'].dt.year.astype('Int64', errors='ignore')
-        df['month_check'] = df['incident_date'].dt.month.astype('Int64', errors='ignore')
-
-        # Ensure 'year' and 'month' columns are numeric
-        df['year'] = pd.to_numeric(df['year'], errors='coerce').astype('Int64', errors='ignore')
-        df['month'] = pd.to_numeric(df['month'], errors='coerce').astype('Int64', errors='ignore')
-
-        year_mismatch = (df['year'] != df['year_check'])
-        month_mismatch = (df['month'] != df['month_check'])
-        total_mismatch = year_mismatch | month_mismatch
-
-        if total_mismatch.any():
-            df.loc[total_mismatch, 'year'] = df.loc[total_mismatch, 'year_check']
-            df.loc[total_mismatch, 'month'] = df.loc[total_mismatch, 'month_check']
-        
-            issues.append(
-                f"Fixed {year_mismatch.sum()} year mismatches and {month_mismatch.sum()} month mismatches."
-            )
-
-        df = df.drop(columns=['year_check', 'month_check'])
-
     return df
 
 def add_features_bh(df: pd.DataFrame)-> pd.DataFrame:
@@ -236,8 +244,11 @@ def add_features_ir(df: pd.DataFrame) -> pd.DataFrame:
 
         df['year'] = date.dt.year
         df['month'] = date.dt.month
-        df["quarter"] = "Q" + date.dt.quarter.astype(str)
-        df["day_of_week"] = date.dt.day_name()
+        
+        quarter_series = date.dt.quarter.astype('Int64')
+        df["quarter"] = np.where(quarter_series.notna(), "Q" + quarter_series.astype(str), np.nan)
+        
+        df["day_of_week"] = date.dt.day_name().astype('category')
         df["is_weekend"] = date.dt.dayofweek.isin([5, 6])
         df["day_of_year"] = date.dt.dayofyear
     else:
@@ -277,7 +288,7 @@ def drop_zero_variance_cat(df: pd.DataFrame) -> pd.DataFrame:
     '''
     Remove categorical columns with zero variance
     '''
-    cat_cols = df.select_dtypes(include='object').columns
+    cat_cols = df.select_dtypes(include=['object', 'category']).columns
 
     zero_var_cols = [col for col in cat_cols if df[col].nunique(dropna=True) <= 1]
 
@@ -300,48 +311,20 @@ def cleanup_unused_offense_cols(df: pd.DataFrame) -> pd.DataFrame:
                 f"bias_motivation_{i}{suffix}", f"bias_{i}{suffix}_category"
             ])
     
-    existing_offense_columns = [col for col in all_offense_columns if col in df.columns]
-    columns_to_drop = []
+    existing_offense_cols = [col for col in all_offense_columns if col in df.columns]
+    
+    if not existing_offense_cols:
+        return df
 
-    for col in existing_offense_columns:
-        if df[col].isnull().all():
-            columns_to_drop.append(col)
+    empty_cols = df[existing_offense_cols].columns[df[existing_offense_cols].isna().all()].tolist()
 
-    if columns_to_drop:
-        print(f"Dropping {len(columns_to_drop)} completely empty offense columns: {columns_to_drop}")
-        df = df.drop(columns=columns_to_drop)
-    else:
-        print("No completely empty offense columns found to drop.")
-        
+    if empty_cols:
+        print(f"Dropping {len(empty_cols)} completely empty offense columns.")
+        return df.drop(columns=empty_cols)
+
     return df
 
 def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
-    bh_cols_to_keep = ['ori', 'state_code', 'state_abbr', 'state_name', 
-                        'agency_name', 'agency_type', 'date_ori_went_nibrs', 'master_file_year',
-                        'city_name', 'is_core_city', 'population_group',
-                        'country_division', 'country_region', 'judicial_district',
-                        'current_population', 'last_population',
-                        'state_q1_activity', 'state_q2_activity', 'state_q3_activity', 'state_q4_activity', 
-                        'federal_q1_activity', 'federal_q2_activity', 'federal_q3_activity', 'federal_q4_activity', 
-                        'fips_counties_1', 'fips_counties_2', 'fips_counties_3', 'fips_counties_4', 'fips_counties_5',
-                        'bh_index', 'file_id']
-    ir_cols_to_keep = [ 'ori', 'incident_number', 'incident_date',
-                        'data_source', 'year', 'quarter', 'month', 'day_of_week', 'is_weekend', 
-                        'total_victims', 'num_adult_victims', 'num_juvenile_victims',
-                        'total_offenders', 'num_adult_offenders', 'num_juvenile_offenders',
-                        'victim_offender_ratio',
-                        'offender_race', 'offender_ethnicity',
-                        'file_id', 'bh_index']
-    # Expand offense fields automatically
-    for i in range(1, 11):
-        ir_cols_to_keep.extend([
-            f"offense_{i}", f'offense_{i}_severity', f"num_victims_{i}", f"victim_types_{i}", f"location_{i}"
-        ])
-        for suffix in ['a', 'b', 'c', 'd', 'e']:
-            ir_cols_to_keep.extend([
-                f"bias_motivation_{i}{suffix}", f"bias_{i}{suffix}_category"
-            ])
-    
     if df_type == 'bh':
         df = df.dropna(axis=1, how='all')
         df = drop_zero_variance_cat(df)
