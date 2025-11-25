@@ -58,7 +58,7 @@ ir_specs = [
     (5, 13, 'ori'),               # ORI read from the IR line itself
     (14, 25, 'incident_number'), (26, 33, 'incident_date'),
     (34, 34, 'data_source'), (35, 35, 'quarter'),
-    (36, 38, 'num_victims'), (39, 40, 'num_offenders'),
+    (36, 38, 'total_victims'), (39, 40, 'total_offenders'),
     (41, 41, 'offender_race'),
     # Offense 1
     (42, 44, 'ucr_offense_code_1'), (45, 47, 'num_victims_1'), (48, 49, 'location_code_1'),
