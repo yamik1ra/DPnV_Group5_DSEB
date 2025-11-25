@@ -42,7 +42,7 @@ def enrich_with_population(df_clean: pd.DataFrame) -> pd.DataFrame:
         id_vars="state_name",
         value_vars=[2021, 2022, 2023, 2024],
         var_name="year",
-        value_name="population"
+        value_name="state_population"
     )
 
     df_territories = pd.read_csv(TERR_FILE)
@@ -63,7 +63,7 @@ def enrich_with_population(df_clean: pd.DataFrame) -> pd.DataFrame:
         validate="many_to_one"
     )
 
-    missing = df_enriched["population"].isna().sum()
+    missing = df_enriched["state_population"].isna().sum()
     if missing > 0:
         print(f"⚠️ WARNING: {missing} rows have missing population data (check state_name or year).")
 
