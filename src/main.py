@@ -5,12 +5,14 @@ Runs full ETL pipeline:
 1. Load raw fixed-width text files
 2. Decode coded values
 3. Clean + transform dataset
-4. Save final processed data
+4. Enrich with external population data
+5. Save final processed data
 '''
 
 from load_data import load_all_raw
 from decode import decode_all
 from clean_transform import clean_and_merge
+from enrich import enrich_with_population
 
 import warnings
 import pandas as pd
@@ -32,10 +34,17 @@ def main():
     print("🗃️ Decoded files saved!")
 
     print("\n=== 🧼 STEP 3: Cleaning & transforming data ===")
-    clean_df = clean_and_merge(df_bh_dec, df_ir_dec)
+    df_clean = clean_and_merge(df_bh_dec, df_ir_dec)
 
-    clean_df.to_parquet(PROJECT_ROOT / "data/processed/hatecrimes_clean.parquet", index=False, engine='pyarrow')
+    df_clean.to_parquet(PROJECT_ROOT / "data/processed/hatecrimes_clean.parquet", index=False, engine='pyarrow')
     print("🗃️ Cleaned files saved!")
+
+    print("\n=== ➕ STEP 4: Enriching with population data ===")
+    df_enriched = enrich_with_population(df_clean)
+
+    enriched_path = PROJECT_ROOT / "data/processed/hatecrimes_enriched.parquet"
+    df_enriched.to_parquet(enriched_path, index=False)
+    print("🗃️ Enriched file saved!")
     
     print("✅ Pipeline completed successfully!")
 
