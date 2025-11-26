@@ -65,7 +65,7 @@ def enrich_with_population(df_clean: pd.DataFrame) -> pd.DataFrame:
 
     missing = df_enriched["state_population"].isna().sum()
     if missing > 0:
-        print(f"⚠️ WARNING: {missing} rows have missing population data (check state_name or year).")
+        print(f"⚠️ WARNING: {missing} rows have missing state population data.\n    Possible causes: federal agency / missing 'state_name' / missing 'year'.")
 
     print(f"   Final enriched dataset size: {df_enriched.shape}")
 

@@ -282,7 +282,7 @@ def decode_offense_flexible(code):
     if code in UCR_OFFENSE_CODES:
         return UCR_OFFENSE_CODES[code]
     elif str(code).startswith('23') and len(str(code)) == 3:
-        return 'All Other Larceny (23H)'
+        return 'Other Larceny'
     else:
         return None
 

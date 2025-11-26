@@ -105,6 +105,17 @@ def convert_numeric(df:pd.DataFrame, numeric_cols: List[str]=None) -> pd.DataFra
     
     return df
 
+def normalize_name(df: pd.DataFrame) -> pd.DataFrame:
+    
+    if 'agency_name' in df.columns:
+        df['agency_name'] = df['agency_name'].str.upper()
+
+    # Capitalize the first letter of city_name
+    if 'city_name' in df.columns:
+        df['city_name'] = df['city_name'].str.title()
+    
+    return df
+
 def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
     # victim/offender: negative → NA
     victim_offender_cols = [
@@ -272,11 +283,14 @@ def add_features_ir(df: pd.DataFrame) -> pd.DataFrame:
     # OFFENSE SEVERITY
     # ---------------------------------
     for i in range(1, 11):
-        offense_col = f'ucr_offense_code_{i}'
+        offense_code = f'ucr_offense_code_{i}'
+        offense = f'offense_{i}'
         severity_col = f'offense_{i}_severity'
 
-        if offense_col in df.columns:
-            df[severity_col] = df[offense_col].map(OFFENSE_SEVERITY_MAP)
+        if (offense_code in df.columns) and (offense in df.columns):
+            df[severity_col] = df[offense_code].map(OFFENSE_SEVERITY_MAP)
+            
+            df.loc[df[offense] == 'Other Larceny', severity_col] = 'Low'
 
     return df
 
@@ -347,6 +361,7 @@ def clean_bh(df_bh: pd.DataFrame) -> pd.DataFrame:
     df_bh = replace_placeholders(df_bh)
     df_bh = convert_date(df_bh)
     df_bh = convert_numeric(df_bh)
+    df_bh = normalize_name(df_bh)
     df_bh = handle_missing(df_bh)
     df_bh = validate(df_bh)
     df_bh = add_features_bh(df_bh)
