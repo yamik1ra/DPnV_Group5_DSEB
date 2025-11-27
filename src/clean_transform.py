@@ -42,32 +42,54 @@ OFFENSE_SEVERITY_MAP = {
     # Non-Criminal/Informational
     '09C': 'Non-Criminal'
 }
+SIMPLIFIED_POPULATION_GROUP = {
+    # Cities
+    'Cities 1,000,000+': 'Cities: 1,000,000+',
+    'Cities 500,000-999,999': 'Cities: 500,000-999,999',
+    'Cities 250,000-499,999': 'Cities: 100,000-499,999',
+    'Cities 100,000-249,999': 'Cities: 100,000-499,999',
+    'Cities 50,000-99,999': 'Cities: 50,000-99,999',
+    'Cities 25,000-49,999': 'Cities: 10,000-49,999',
+    'Cities 10,000-24,999': 'Cities: 10,000-49,999',
+    'Cities 2,500-9,999': 'Cities: under 10,000',
+    # MSA Counties
+    'MSA Counties 100,000+': 'MSA Counties: 100,000+',
+    'MSA Counties 25,000-99,999': 'MSA Counties: 10,000-99,999',
+    'MSA Counties 10,000-24,999': 'MSA Counties: 10,000-99,999',
+    'MSA Counties 2,500-9,999': 'MSA Counties: under 10,000',
+    # Non-MSA Counties
+    'Non-MSA Counties 100,000+': 'Non-MSA Counties: 100,000+',
+    'Non-MSA Counties 25,000-99,999': 'Non-MSA Counties: 10,000-99,999',
+    'Non-MSA Counties 10,000-24,999': 'Non-MSA Counties: 10,000-99,999',
+    'Non-MSA Counties 2,500-9,999': 'Non-MSA Counties: under 10,000',
+    # Other
+    'Possessions': 'Possessions'
+}
 
-bh_cols_to_keep = ['ori', 'state_code', 'state_abbr', 'state_name', 
+bh_cols_to_keep = [ 'state_code', 'state_abbr', 'state_name', 
                     'agency_name', 'agency_type', 'date_ori_went_nibrs', 'master_file_year',
                     'city_name', 'is_core_city', 'population_group',
                     'country_division', 'country_region', 'judicial_district',
                     'current_population', 'last_population',
-                    'state_q1_activity', 'state_q2_activity', 'state_q3_activity', 'state_q4_activity', 
-                    'federal_q1_activity', 'federal_q2_activity', 'federal_q3_activity', 'federal_q4_activity', 
-                    'fips_counties_1', 'fips_counties_2', 'fips_counties_3', 'fips_counties_4', 'fips_counties_5',
                     'bh_index', 'file_id']
 ir_cols_to_keep = [ 'ori', 'incident_number', 'incident_date',
-                    'data_source', 'year', 'quarter', 'month', 'day_of_week', 'is_weekend', 
+                    'year', 'quarter', 'month', 'day_of_week', 'is_weekend', 
                     'total_victims', 'num_adult_victims', 'num_juvenile_victims',
                     'total_offenders', 'num_adult_offenders', 'num_juvenile_offenders',
                     'victim_offender_ratio',
                     'offender_race', 'offender_ethnicity',
                     'file_id', 'bh_index']
 # Expand offense fields automatically
+offense_cols = []
 for i in range(1, 11):
-    ir_cols_to_keep.extend([
+    offense_cols.extend([
         f"offense_{i}", f'offense_{i}_severity', f"num_victims_{i}", f"victim_types_{i}", f"location_{i}"
     ])
     for suffix in ['a', 'b', 'c', 'd', 'e']:
-        ir_cols_to_keep.extend([
+        offense_cols.extend([
             f"bias_motivation_{i}{suffix}", f"bias_{i}{suffix}_category"
         ])
+ir_cols_to_keep.extend(offense_cols)
 
 def replace_placeholders(df: pd.DataFrame) -> pd.DataFrame:
     '''
@@ -96,7 +118,6 @@ def convert_numeric(df:pd.DataFrame, numeric_cols: List[str]=None) -> pd.DataFra
         numeric_cols = [
             col for col in df.columns 
             if col.lower().startswith(("num_", "current_", "last_", "total_"))
-            or col.lower().endswith(("_count", "_num"))
         ]
 
     for col in numeric_cols:
@@ -125,11 +146,6 @@ def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
     for col in victim_offender_cols:
         if col in df.columns:
             df.loc[df[col] < 0, col] = np.nan
-
-    # offender race/ethnicity: Unknown → NaN
-    for col in ['offender_race','offender_ethnicity']:
-        if col in df.columns:
-            df[col] = df[col].replace('Unknown', np.nan)
 
     # population <= 0 should means missing information
     pop_cols = df.filter(regex=r'^(current|last)_population_\d+$').columns.tolist()
@@ -169,7 +185,7 @@ def handle_incident_number_duplicates(df: pd.DataFrame) -> pd.DataFrame:
             df['incident_number'] = df['ori'].astype(str) + '-' + df['incident_number'].astype(str)
 
         else:
-            print('⚠️ Warning: Conflicting records for the same (ori, incident_number). Appending unqiue suffix.')
+            print('Warning: Conflicting records for the same (ori, incident_number).\nAppending unqiue suffix.')
             
             # Create a deduplicated ID by appending a counter
             df['incident_number'] = (
@@ -184,7 +200,7 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
     issues = []
 
     # ------------------------------------------------------
-    # Victim totals consistency check
+    # Victim totals consistency check (Age-based)
     # ------------------------------------------------------
     if all(c in df.columns for c in ['num_adult_victims', 'num_juvenile_victims', 'total_victims']):
         calculated_total = (df['num_adult_victims'].fillna(0) + df['num_juvenile_victims'].fillna(0))
@@ -195,8 +211,8 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
 
         if mismatch_count > 0:
             df.loc[mismatch_mask, 'total_victims'] = calculated_total[mismatch_mask]
-            issues.append(f"Fixed {mismatch_count} victim count mismatches.")
-    
+            issues.append(f"Fixed {mismatch_count} victim count mismatches (Age Split vs Total).")
+
     # ------------------------------------------------------
     # Offender totals consistency check
     # ------------------------------------------------------
@@ -228,17 +244,24 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
         if old_mask.sum() > 0:
             issues.append(f"Found {old_mask.sum()} incidents before year 2021.")
 
+    print(issues) if issues else None
+
     return df
 
 def add_features_bh(df: pd.DataFrame)-> pd.DataFrame:
-    # ---------------------------------
+    # -----------------------------------------------
     # Total POPULATION the agency is responsible for
-    # ---------------------------------
+    # -----------------------------------------------
     current_pop_cols = df.filter(regex=r'^current_population_\d+$')
     last_pop_cols = df.filter(regex=r'^last_population_\d+$')
     
     df['current_population'] = current_pop_cols.sum(axis=1, min_count=1)
     df['last_population'] = last_pop_cols.sum(axis=1, min_count=1)
+
+    # -----------------------------------------------
+    # SIMPLIFIED POPULATION GROUP 
+    # -----------------------------------------------
+    df['population_group'] = df['population_group'].map(SIMPLIFIED_POPULATION_GROUP).fillna(df['population_group'])
 
     return df
 
@@ -276,8 +299,12 @@ def add_features_ir(df: pd.DataFrame) -> pd.DataFrame:
     df['total_offenders'] = df['num_adult_offenders'].fillna(0) + df['num_juvenile_offenders'].fillna(0)
     
     df['victim_offender_ratio'] = df['total_victims'] / df['total_offenders']
-    # Replace divide-by-zero or invalid values with NaN
-    df['victim_offender_ratio'] = df['victim_offender_ratio'].replace([np.inf, -np.inf], np.nan)
+    df['victim_offender_ratio'] = np.divide(
+        df['total_victims'],
+        df['total_offenders'],
+        out=np.full_like(df['total_victims'], np.inf, dtype=float),
+        where=(df['total_offenders'] != 0)
+    )
     
     # ---------------------------------
     # OFFENSE SEVERITY
@@ -339,15 +366,134 @@ def drop_unnecessary_cols(df: pd.DataFrame, df_type: str) -> pd.DataFrame:
         df = df.dropna(axis=1, how='all')
         df = drop_zero_variance_cat(df)
         keep = bh_cols_to_keep
+    
     elif df_type == "ir":
         df = cleanup_unused_offense_cols(df)
         keep = ir_cols_to_keep
+    
     else:
         raise ValueError("df_type must be either 'bh' or 'ir'")
     
     keep = [col for col in keep if col in df.columns]
 
     return df[keep]
+
+def unpivot_to_offense_rows(df: pd.DataFrame, offense_cols: list=None) -> pd.DataFrame:
+    """
+    Convert wide incident-level data (offense_1..offense_10) 
+    into long offense-level data (one row per actual offense).
+
+    - Keeps only rows where an offense exists (offense_i not null).
+    - Preserves all non-offense incident-level columns.
+    """
+    # Use the global offense_cols list defined at the module level
+    if offense_cols is None:
+        # Fallback to recreate the list if the function is called without it
+        offense_cols = []
+        for i in range(1, 11):
+            offense_cols.extend([
+                f"offense_{i}", f'offense_{i}_severity', f"num_victims_{i}", f"victim_types_{i}", f"location_{i}"
+            ])
+            for suffix in ['a', 'b', 'c', 'd', 'e']:
+                offense_cols.extend([
+                    f"bias_motivation_{i}{suffix}", f"bias_{i}{suffix}_category"
+                ])
+
+    offense_dfs = []
+    
+    # 1. Dynamic Slot Identification
+    # Identify the maximum offense slot number that exists in the DataFrame by checking 'offense_i' columns
+    max_slot = 0
+    for col in df.columns:
+        if col.startswith("offense_") and len(col.split('_')) == 2:
+            try:
+                slot = int(col.split("_")[1])
+                max_slot = max(max_slot, slot)
+            except ValueError:
+                continue
+
+    offense_slots = range(1, max_slot + 1)
+    
+    # Use a set for efficient column existence checks
+    df_cols_set = set(df.columns)
+    
+    # Identify all columns that are NOT offense-related (Incident-level details)
+    incident_cols = [c for c in df.columns if c not in offense_cols]
+
+    for i in offense_slots:
+        offense_i_prefix = f"offense_{i}"
+
+        # Ensure the primary offense column for this slot exists
+        if offense_i_prefix not in df_cols_set:
+            continue
+
+        # Mask to select rows where the offense actually exists (i.e., offense_i is not NaN)
+        mask = df[offense_i_prefix].notna()
+
+        if mask.sum() == 0:
+            continue
+
+        # 2. Dynamic Column Filtering (Handles pre-dropped columns)
+        # Generate the list of all potential columns for slot 'i' from the global offense_cols list
+        all_potential_offense_i_cols = [
+            col for col in offense_cols
+            if col.startswith(f"offense_{i}") or
+               col.startswith(f"num_victims_{i}") or
+               col.startswith(f"victim_types_{i}") or
+               col.startswith(f"location_{i}") or
+               col.startswith(f"bias_motivation_{i}") or
+               col.startswith(f"bias_{i}")
+        ] 
+        
+        # Filter this list against the actual columns present in the DataFrame (df_cols_set)
+        offense_columns_for_i = [col for col in all_potential_offense_i_cols if col in df_cols_set]
+        
+        # Extract corresponding data
+        tmp = df.loc[mask, incident_cols + offense_columns_for_i].copy()
+
+        # 3. Rename Offense Columns to generic names (e.g., offense_1 -> offense)
+        rename_map = {}
+        for col in offense_columns_for_i:
+
+            # Standard Offense Columns
+            if col == f"offense_{i}":
+                rename_map[col] = "offense"
+            elif col == f"offense_{i}_severity":
+                rename_map[col] = "offense_severity"
+            elif col == f"num_victims_{i}":
+                rename_map[col] = "num_victims"
+            elif col == f"victim_types_{i}":
+                rename_map[col] = "victim_types"
+            elif col == f"location_{i}":
+                rename_map[col] = "location"
+            
+            # Bias Motivation Columns (e.g., bias_motivation_1a -> bias_motivation_a)
+            elif col.startswith(f"bias_motivation_{i}"):
+                suffix = col.split(f"bias_motivation_{i}")[-1] 
+                rename_map[col] = f"bias_motivation_{suffix}" 
+
+            elif col.startswith(f"bias_{i}") and col.endswith("_category"):
+                suffix = col.split(f"bias_{i}")[-1].replace("_category", "")
+                rename_map[col] = f"bias_{suffix}_category"
+
+        tmp = tmp.rename(columns=rename_map)
+
+        # Add the offense slot index for tracking which offense it was (1st, 2nd, etc.)
+        tmp["offense_index"] = i
+
+        offense_dfs.append(tmp)
+
+    # 4. Concatenate and Finalize
+    if not offense_dfs:
+        # Return an empty DataFrame with the incident columns plus generic offense columns
+        generic_offense_cols = ["offense", "offense_severity", "num_victims", "victim_types", "location", "offense_index"]
+        # Add the 10 bias columns (a-e motivation and a-e category) to the list
+        for suffix in ['a', 'b', 'c', 'd', 'e']:
+            generic_offense_cols.extend([f"bias_motivation_{suffix}", f"bias_{suffix}_category"])
+
+        return pd.DataFrame(columns=incident_cols + generic_offense_cols)
+
+    return pd.concat(offense_dfs, ignore_index=True)
 
 # ------------------------------------------
 #   BH & IR SPECIFIC CLEANING FUNCTIONS
@@ -422,7 +568,9 @@ def clean_and_merge(df_bh: pd.DataFrame, df_ir: pd.DataFrame) -> pd.DataFrame:
 
     print("🔗 Merging BH + IR dataframes...")
     clean_df = merge_bh_ir(df_bh_clean, df_ir_clean)
-    clean_df = clean_df.reset_index()
+
+    clean_df = unpivot_to_offense_rows(clean_df.reset_index())
+
     clean_df = clean_df.drop_duplicates(ignore_index=True)
 
     return clean_df
