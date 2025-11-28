@@ -134,7 +134,7 @@ def analyze_geographic_trend(df: pd.DataFrame):
 
     if not regional.empty:
         # Sort ascending for cleaner horizontal bar chart presentation
-        regional_sorted = regional.sort_values(ascending=True) 
+        regional_sorted = regional.sort_values(ascending=False) 
         
         # Plotting
         axes[0].barh(range(len(regional_sorted)), regional_sorted.values, 
@@ -162,7 +162,7 @@ def analyze_geographic_trend(df: pd.DataFrame):
 
     if not top_states.empty:
         # Sort ascending for cleaner horizontal bar chart presentation
-        top_states_sorted = top_states.sort_values(ascending=True) 
+        top_states_sorted = top_states.sort_values(ascending=False) 
 
         # Plotting
         axes[1].barh(range(len(top_states_sorted)), top_states_sorted.values, 
@@ -267,7 +267,7 @@ def analyze_population_rate(df: pd.DataFrame):
 
     # --- CHART 1: RAW INCIDENT COUNT ---
     axes[0].barh(range(len(top10_count)), top10_count['incidents'].values,
-                 color=plt.cm.Blues(np.linspace(0.9, 0.4, len(top10_count))))
+                 color=plt.cm.Blues(np.linspace(0.4, 0.9, len(top10_count))))
     axes[0].set_yticks(range(len(top10_count)))
     axes[0].set_yticklabels(top10_count['state_name'], fontsize=12)
     axes[0].set_xlabel('Total Unique Incidents', fontweight='bold', fontsize=11)
@@ -281,7 +281,7 @@ def analyze_population_rate(df: pd.DataFrame):
 
     # --- CHART 2: PER CAPITA RATE (Incidents per 100k) ---
     axes[1].barh(range(len(top10_rate)), top10_rate['incidents_per_100k'].values,
-                 color=plt.cm.Oranges(np.linspace(0.9, 0.4, len(top10_rate))))
+                 color=plt.cm.Oranges(np.linspace(0.4, 0.9, len(top10_rate))))
     axes[1].set_yticks(range(len(top10_rate)))
     axes[1].set_yticklabels(top10_rate['state_name'], fontsize=12)
     axes[1].set_xlabel('Incidents per 100,000 Population', fontweight='bold', fontsize=11)
@@ -2457,3 +2457,96 @@ def plot_offender_demographics(df: pd.DataFrame):
     print("   • Address racial disparities in offender demographics")
     print("   • Target prevention efforts toward dominant offender groups")
     print("   • Develop region-specific intervention strategies")
+
+def plot_yearly_daily_incident_analysis(df):
+    # Define the years to analyze
+    years = [2021, 2022, 2023, 2024]
+
+    print("📊 YEARLY DAILY INCIDENT ANALYSIS:")
+    print("="*60)
+
+    # Analyze each year separately
+    for year in years:
+        # Filter data for the specific year
+        df_year = df[df['incident_date'].dt.year == year]
+        
+        # Group incidents by date and count daily totals
+        daily_incidents = df_year.groupby(df_year['incident_date'].dt.date).size()
+        
+        # Find the peak date and count for this year
+        peak_date = daily_incidents.idxmax()
+        peak_count = daily_incidents.max()
+        
+        # Print summary for this year
+        print(f"\n{year}:")
+        print(f"   • Days analyzed: {len(daily_incidents)}")
+        print(f"   • Total incidents: {daily_incidents.sum()}")
+        print(f"   • Average daily: {daily_incidents.mean():.2f}")
+        print(f"   • Peak date: {peak_date.strftime('%B %d')} with {peak_count} incidents")
+        print(f"   • Days with 10+ incidents: {len(daily_incidents[daily_incidents >= 10])}")
+        
+        # Create the line chart for this year
+        plt.figure(figsize=(14, 6))
+        plt.plot(daily_incidents.index, daily_incidents.values, linewidth=1.5, color='#FF6B35', alpha=0.8)
+        
+        # Highlight the peak
+        plt.scatter([peak_date], [peak_count], color='red', s=80, zorder=5, 
+                label=f'Peak: {peak_count} incidents')
+        
+        # Add a 7-day rolling average for trend visualization
+        if len(daily_incidents) >= 7:
+            rolling_avg = daily_incidents.rolling(window=7, center=True).mean()
+            plt.plot(daily_incidents.index, rolling_avg, linewidth=2, color='#2E8B57', alpha=0.7,
+                    label='7-day rolling average')
+        
+        # Add Pride Month period (June) as a shaded region
+        start_pride = pd.Timestamp(year=year, month=6, day=1)
+        end_pride = pd.Timestamp(year=year, month=6, day=30)
+        plt.axvspan(start_pride, end_pride, alpha=0.2, color='purple', label='Pride Month (June)')
+        
+        # Add event markers for Hamas-led attack and anniversary
+        if year == 2023:
+            hamas_attack = pd.Timestamp(year=2023, month=10, day=7)
+            plt.axvline(x=hamas_attack, color='black', linestyle='--', linewidth=2, label='Hamas Attack (10/07/2023)')
+        elif year == 2024:
+            anniversary = pd.Timestamp(year=2024, month=10, day=7)
+            plt.axvline(x=anniversary, color='black', linestyle='--', linewidth=2, label='1st Anniversary - Hamas Attack (10/07/2024)')
+        
+        plt.title(f'Daily Hate Crime Incidents - {year}', fontsize=14, fontweight='bold', pad=20)
+        plt.xlabel('Date', fontsize=12, fontweight='bold')
+        plt.ylabel('Number of Incidents', fontsize=12, fontweight='bold')
+        plt.legend(loc='upper left')
+        plt.grid(True, alpha=0.3)
+        plt.xticks(rotation=45)
+        
+        # Format x-axis to show months
+        import matplotlib.dates as mdates
+        plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+        
+        plt.tight_layout()
+        plt.show()
+
+    print("\n" + "="*60)
+    print("💡 INSIGHTS ACROSS YEARS:")
+    print("   • Each year shows unique patterns in daily incident distribution")
+    print("   • Peak dates vary, indicating different triggering events each year")
+    print("   • The 7-day rolling average reveals sustained high-activity periods")
+    print("   • Pride Month (June) is highlighted to show patterns during this period")
+    print("   • Days with 10+ incidents: {len(daily_incidents[daily_incidents >= 10])}")
+    print("   • Event markers for Hamas attack (2023) and anniversary (2024) added for context")
+
+    # Overall comparison
+    print("\n📊 OVERALL PEAK COMPARISON:")
+    yearly_peaks = {}
+    for year in years:
+        df_year = df[df['incident_date'].dt.year == year]
+        daily_incidents = df_year.groupby(df_year['incident_date'].dt.date).size()
+        peak_date = daily_incidents.idxmax()
+        peak_count = daily_incidents.max()
+        yearly_peaks[year] = {'date': peak_date, 'count': peak_count}
+
+    for year, peak_info in yearly_peaks.items():
+        print(f"   • {year}: {peak_info['date'].strftime('%B %d')} ({peak_info['count']} incidents)")
+
+    print("\n🎯 This yearly breakdown reveals temporal patterns and helps identify year-specific factors!")
