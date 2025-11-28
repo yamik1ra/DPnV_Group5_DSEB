@@ -2511,6 +2511,12 @@ def plot_yearly_daily_incident_analysis(df):
         elif year == 2024:
             anniversary = pd.Timestamp(year=2024, month=10, day=7)
             plt.axvline(x=anniversary, color='black', linestyle='--', linewidth=2, label='1st Anniversary - Hamas Attack (10/07/2024)')
+        elif year == 2021:
+            event = pd.Timestamp(year=2021, month=4, day=20)
+            plt.axvline(x=event, color='black', linestyle='--', linewidth=2, label='Guilty Verdict - George Floyd Case (20/04/2021)')
+        elif year == 2022:
+            event = pd.Timestamp(year=2022, month=2, day=24)
+            plt.axvline(x=event, color='black', linestyle='--', linewidth=2, label='Russia Invades Ukraine (24/02/2022)')
         
         plt.title(f'Daily Hate Crime Incidents - {year}', fontsize=14, fontweight='bold', pad=20)
         plt.xlabel('Date', fontsize=12, fontweight='bold')
