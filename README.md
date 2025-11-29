@@ -48,7 +48,8 @@ DPNV_GROUP5_DSEB/
 │   ├── main.py                 # Full pipeline execution script
 │   └── visualize.py            # Helper functions for plots
 │
-└── README.md
+├── README.md
+└── requirements.txt
 ```
 
 ---
