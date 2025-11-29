@@ -81,7 +81,7 @@ Outputs stored in `data/interim/`:
 ✔ Fix inconsistent values <br>
 ✔ Derive temporal features  <br>
 ✔ Create severity for each offense  <br>
-✔ Merge Incident Reports (IR) with Batch Headers (BH)
+✔ Merge Incident Reports (IR) with Batch Headers (BH) <br>  
 ✔ Unpivot offenses: incident_level → offense-level dataset<br>
 ✔ Save clean output → `data/processed/hatecrimes_clean.parquet`
 
