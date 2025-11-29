@@ -74,15 +74,15 @@ Outputs stored in `data/interim/`:
 ### **3️⃣ Clean & Transform**
 `clean_transform.py` performs the heavy lifting:
 
-✔ Convert datetime columns properly 
-✔ Convert numeric columns properly 
-✔ Handle missing bias/ethnicity/race
-✔ Drop irrelevant columns  
-✔ Fix inconsistent values 
-✔ Derive temporal features  
-✔ Create severity for each offense  
-✔ Merge Incident Reports (IR) with Batch Headers (BH)   
-✔ Unpivot offenses: incident_level → offense-level dataset
+✔ Convert datetime columns properly <br>
+✔ Convert numeric columns properly <br>
+✔ Handle missing bias/ethnicity/race <br>
+✔ Drop irrelevant columns  <br>
+✔ Fix inconsistent values <br>
+✔ Derive temporal features  <br>
+✔ Create severity for each offense  <br>
+✔ Merge Incident Reports (IR) with Batch Headers (BH) <br>  
+✔ Unpivot offenses: incident_level → offense-level dataset<br>
 ✔ Save clean output → `data/processed/hatecrimes_clean.parquet`
 
 ---
