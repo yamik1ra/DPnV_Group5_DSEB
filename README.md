@@ -1,175 +1,324 @@
-# 📘 **Hate Crime Data Preparation, Enrichment, and Visualization (2021–2024)**
-*A complete data engineering + storytelling pipeline for the US Hate Crime Database*
+# 📘 Hate Crime Data Preparation & Storytelling (2021–2024)
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Status](https://img.shields.io/badge/Status-Completed-brightgreen)
+
+*A complete ETL, data cleaning, enrichment, visualization, and machine learning workflow built using the FBI Hate Crime Master Files.*
 
 ---
 
-## 📌 **Project Overview**
+## 🔗 Table of Contents
 
-This project transforms raw U.S. hate crime data (2021–2024) into a clean, enriched, analysis-ready dataset, and produces visual storytelling insights.  
-It was created as the final project for **Data Preparation & Visualization**, focusing on:
+* [Project Overview](#project-overview)
+* [Dataset Description](#dataset-description)
+* [Feature Description](#feature-description)
+* [Project Structure](#project-structure)
+* [Pipeline Overview](#pipeline-overview)
 
-- Large-scale data cleaning  
-- Feature extraction & validation  
-- Data enrichment with external population data  
-- Offense-level unpivoting  
-- Exploratory visualization & storytelling  
-
-The final processed outputs are stored as **Parquet** files for efficient loading.
+  * [Load Raw Data](#1️⃣-load-raw-data--srcload_datapy)
+  * [Decode Fields](#2️⃣-decode-fields--srcdecodepy)
+  * [Clean and Transform](#3️⃣-clean--transform--srcclean_transformpy)
+  * [Enrich Population Data](#4️⃣-enrich-population-data--srcenrichpy)
+  * [Visualization Module](#5️⃣-visualizations--srcvisualizepy)
+  * [Run Pipeline](#6️⃣-run-full-pipeline--srcmainpy)
+* [Storytelling & Visualizations](#storytelling--visualizations)
+* [Machine Learning Component](#machine-learning-component)
+* [How to Run](#how-to-run-the-project)
+* [Requirements](#requirements)
+* [Authors](#authors)
 
 ---
 
-## 🗂️ **Project Structure**
+# 📌 Project Overview
+
+This project demonstrates the **importance of Data Preparation** by transforming raw FBI Hate Crime Master Files into a clean, enriched, offense-level dataset used for visualization and machine learning storytelling.
+
+It fulfills the course requirement:
+
+> ✔ “Use data storytelling to show how data preparation affects insights and model performance.”
+
+---
+
+# 📂 Dataset Description
+
+### Raw Data (FBI Hate Crime Master Files)
+
+* Format: **fixed-width text**
+* Two hierarchical data structures:
+
+  * **BH – Batch Header** (state, agency, reporting metadata)
+  * **IR – Incident Report** (victims, offenders, bias motivations, offenses)
+* Up to **10 offenses per incident**
+
+### External Data
+
+Stored under `data/external_data/`:
+
+* `state_population_21-24.xlsx`
+* `territories_population_21-24.csv`
+
+### Processed Outputs
+
+Located in `data/processed/`:
+
+* `bh_decoded.parquet`
+* `ir_decoded.parquet`
+* `hatecrimes_clean.parquet`
+* `hatecrimes_enriched.parquet`
+
+---
+
+# 📑 Feature Description
+
+### **Core Incident Features**
+
+| Feature                     | Description                               |
+| --------------------------- | ----------------------------------------- |
+| `ori`                       | ORI code identifying the reporting agency |
+| `incident_number`           | Unique incident ID                        |
+| `incident_date`             | Date of the incident                      |
+| `year`, `quarter`, `month`  | Extracted temporal dimensions             |
+| `day_of_week`, `is_weekend` | Derived time-based features               |
+
+### **Victim & Offender Features**
+
+| Feature                                         | Description                             |
+| ----------------------------------------------- | --------------------------------------- |
+| `total_victims`                                 | Total number of victims in the incident |
+| `num_adult_victims`, `num_juvenile_victims`     | Age-based victim counts                 |
+| `total_offenders`                               | Total number of offenders               |
+| `num_adult_offenders`, `num_juvenile_offenders` | Age-based offender counts               |
+| `victim_offender_ratio`                         | Victims divided by offenders            |
+
+### **Offense-Level Features** *(after unpivot)*
+
+Each offense becomes its own row.
+
+| Feature                            | Description                                    |
+| ---------------------------------- | ---------------------------------------------- |
+| `offense_type`                     | FBI NIBRS offense description                  |
+| `offense_severity`                 | Derived categorical severity (low/medium/high) |
+| `location`                         | Crime location category                        |
+| `num_victims`                      | Victims related to this specific offense       |
+| `bias_motivation`, `bias_category` | Bias motivation applied to this offense        |
+
+### **Demographic & Geography**
+
+| Feature              | Description                           |
+| -------------------- | ------------------------------------- |
+| `offender_race`      | Race of offender                      |
+| `offender_ethnicity` | Ethnicity of offender                 |
+| `state_name`         | Full state name                       |
+| `state_population`   | Population of that state in that year |
+| `city_name`          | City of reporting agency              |
+
+### **Agency & Metadata**
+
+| Feature                              | Description                          |
+| ------------------------------------ | ------------------------------------ |
+| `agency_name`                        | Reporting agency                     |
+| `agency_type`                        | Municipal / State / Tribal / Federal |
+| `population_group`                   | FBI population grouping              |
+| `country_division`, `country_region` | U.S. Census region                   |
+| `bh_index`                           | Batch header index used for merging  |
+
+---
+
+# 🗂️ Project Structure
 
 ```
 DPNV_GROUP5_DSEB/
 │
 ├── data/
-│   ├── raw/                    # Original FBI NIBRS Hate Crime Master Files
-│   ├── interim/                # Decoded intermediate parquet files
-│   ├── processed/              # Final cleaned & enriched datasets
-│   └── external_data/          # State & territory population datasets for enrichment
+│   ├── raw/                        # Raw FBI Hate Crime Master Files (2021–2024)
+│   ├── interim/                    # Decoded (BH/IR) parquet files
+│   ├── processed/                  # Cleaned + enriched final datasets
+│   └── external_data/              # Population datasets
 │
 ├── docs/
-│   └── data_documentation/     # Definitions, metadata
+│   └── data_documentation/         # Codebooks & reference files
 │
-├── images/                 # Final visualizations
-│   ├── images_before/      # Pre-cleaning diagnostic visuals
-│   └── story_telling/      # Final charts used in storytelling
+├── images/
+│   ├── images_before/              # Dirty-data visual diagnostics
+│   └── story_telling/              # Final figures used in presentation
 │
 ├── notebooks/
-│   ├── raw_data_eda.ipynb           # Exploratory data analysis
-│   └── storytelling.ipynb           # Final storytelling notebook
+│   ├── raw_data_diagnosis.ipynb    # Pre-cleaning exploration
+│   └── storytelling.ipynb          # Storytelling & visualization
 │
 ├── src/
-│   ├── load_data.py            # Load raw master files
-│   ├── decode.py               # Decode FBI fields
-│   ├── clean_transform.py      # Main cleaning framework
-│   ├── enrich.py               # Adds state/territory population data
-│   ├── main.py                 # Full pipeline execution script
-│   └── visualize.py            # Helper functions for plots
+│   ├── load_data.py                # Load fixed-width text master files
+│   ├── decode.py                   # Decode categorical fields using NIBRS code tables
+│   ├── clean_transform.py          # Main cleaning, validation, unpivot transformation
+│   ├── enrich.py                   # Add state/territory population
+│   ├── visualize.py                # Chart helper functions
+│   └── main.py                     # Full ETL pipeline orchestrator
 │
-├── README.md
-└── requirements.txt
+├── requirements.txt
+└── README.md
+
 ```
 
 ---
 
-## 🔧 **Pipeline Steps**
+# 🔧 Pipeline Overview
 
-### **1️⃣ Load Raw Master Files**
-`load_data.py` reads the raw hate crime master files (2021–2024) and prepares them for decoding.
+## **1️⃣ Load Raw Data** — [`src/load_data.py`](src/load_data.py)
 
----
-
-### **2️⃣ Decode Raw Columns**
-`decode.py` translates encoded FBI fields into readable values using the official NIBRS code tables.
-
-Outputs stored in `data/interim/`:
-
-- `bh_decoded.parquet`
-- `ir_decoded.parquet`
+Reads fixed-width text files and extracts BH / IR blocks.
 
 ---
 
-### **3️⃣ Clean & Transform**
-`clean_transform.py` performs the heavy lifting:
+## **2️⃣ Decode Fields** — [`src/decode.py`](src/decode.py)
 
-✔ Convert datetime columns properly <br>
-✔ Convert numeric columns properly <br>
-✔ Handle missing bias/ethnicity/race <br>
-✔ Drop irrelevant columns  <br>
-✔ Fix inconsistent values <br>
-✔ Derive temporal features  <br>
-✔ Create severity for each offense  <br>
-✔ Merge Incident Reports (IR) with Batch Headers (BH)<br>✔ Unpivot offenses: incident_level → offense-level dataset<br>
-✔ Save clean output → `data/processed/hatecrimes_clean.parquet`
+Applies FBI code tables to convert codes into human-readable values.
 
 ---
 
-### **4️⃣ Enrich with Population Data**
-`enrich.py` merges:
+## **3️⃣ Clean & Transform** — [`src/clean_transform.py`](src/clean_transform.py)
 
-- **State population** (from 2021–2024 Excel)
-- **US Territories population** (from digitized documents)
+Key steps include:
+
+* Standardize dates & numeric types
+* Clean missing values
+* Check data consistency
+* Add engineered features
+* Remove unused offense slots
+* Merge incidents with batch headers
+* **Unpivot incidents → offense-level rows**
+
+Output: `hatecrimes_clean.parquet`
+
+---
+
+## **4️⃣ Enrich Population Data** — [`src/enrich.py`](src/enrich.py)
 
 Adds:
 
-- `state_population`
+* State population (2021–2024)
+* Territory population (AS, GU, MP, PR, VI) (2021-2024)
 
-Final file:  
-`data/processed/hatecrimes_enriched.parquet`
-
----
-
-## 📊 **Storytelling & Visualization**
-
-The storytelling notebook (`notebooks/storytelling.ipynb`) includes:
-
-- Top offenses (count + percentage)  
-- State & regional distribution  
-- Bias category dominance by region (with special handling for U.S. possessions)  
-- Temporal trends  
-- Agency reporting patterns  
-- Victim/offender ratio distributions  
-- Population-adjusted hate crime rates  
-
-All final visualizations are stored in:
-
-```
-docs/images/story_telling/
-```
+Output: `hatecrimes_enriched.parquet`
 
 ---
 
-## ▶️ **How to Run the Pipeline**
+## **5️⃣ Visualizations** — [`src/visualize.py`](src/visualize.py)
 
-Run entire pipeline:
+Helper functions for:
+
+* Timeline analysis
+* Offense analysis 
+* Bias motivation and categories analysis 
+* Geography analysis 
+* Offender demographics
+---
+
+## **6️⃣ Run Full Pipeline** — [`src/main.py`](src/main.py)
 
 ```bash
 python src/main.py
 ```
 
-Or run modules individually:
+---
 
-```bash
-python src/load_data.py
-python src/decode.py
-python src/clean_transform.py
-python src/enrich.py
-```
+# 📊 Storytelling & Visualizations
+
+**Notebook:** <br>
+👉 `notebooks/storytelling.ipynb`
+
+**Includes:** <br>
+👉 A comprehensive, narrative-driven analysis of FBI Hate Crime Statistics (2021-2024), structured around a **"What? So What? Now What?"** framework to transform over 40,000 raw records into actionable intelligence:
+
+- **Part I: Data Quality Assessment:** Visualizes the critical transformation from raw to clean data, demonstrating how completeness was improved from ~60% to >95% through standardization and validation.
+
+- **Part II: Contextual Analysis ("WHAT"):** Establishes the factual landscape using year-over-year trends and geographic patterns, highlighting the crucial difference between raw incident counts and population-adjusted rates (per 100k).
+
+- **Part III: Impact Assessment ("SO WHAT"):** Analyzes the complexity of hate crimes, including offense severity, the rise of specific bias motivations (e.g., Anti-Asian trends), and location risk assessments.
+
+- **Part IV: Strategic Action ("NOW WHAT"):** Translates insights into concrete strategies, such as optimizing resource deployment based on temporal patterns (seasonal/weekday) and targeting interventions based on offender demographics.
+
+- **Technical Implementation:** Utilizes Pandas for data manipulation and a mix of Matplotlib, Seaborn, and Plotly to create interactive maps, heatmaps, and trend lines.
 
 ---
 
-## 📦 **Dependencies**
+# 🤖 Machine Learning Component
 
-```
-pandas
-numpy
-pyarrow
-matplotlib
-seaborn
-plotly
+**Notebook:** <br>
+👉 `notebooks/model_comparison.ipynb`
+
+**Objective:** <br>
+👉 Predict whether an offense is motivated by **Race/Ethnicity Bias (1)** versus **Non-Race Bias (0)**.
+
+**The Experiment:** <br>
+👉 We conducted a head-to-head comparison to quantify the impact of our data cleaning pipeline:
+
+1. **Baseline (Dirty Model):** Trained on raw, incident-level data with missing values and no feature engineering using Logistic Regression.
+2. **Final (Clean Model):** Trained on processed, offense-level data enriched with population metrics using a Random Forest Classifier.
+
+
+**Key Results:** Data cleaning did not just improve accuracy; it prevented total model failure.
+
+| **Metric**          | **Dirty Model** | **Clean Model** | **Impact** |
+|---------------------|-----------------|------------------|------------|
+| Accuracy            | 0.56            | 0.65             | +9% improvement in overall correctness |
+| Macro F1-Score      | 0.36            | 0.61             | +25 points indicating more balanced learning |
+| Class 0 Precision   | 0.00            | 0.66             | Fixed “model collapse” — dirty model failed to identify any Class 0 instances |
+
+
+**Critical Insight:** The "Dirty" model suffered from **model collapse**, predicting the majority class (Class 1) for every single instance. The data cleaning and unpivoting process recovered the signal necessary for the model to distinguish between bias types effectively.
+
+---
+
+# ▶️ How to Run the Project
+
+### 1. Clone
+
+```bash
+git clone <your_repo_url>
+cd project
 ```
 
-Install:
+### 2. Install requirements
 
 ```bash
 pip install -r requirements.txt
 ```
 
+### 3. Run ETL Pipeline
+
+```bash
+python src/main.py
+```
+
+### 4. View Processed Outputs
+
+Located in: `data/processed/`
+
+---
+
+# 🧪 Requirements
+
+```
+pandas
+numpy
+matplotlib
+seaborn
+plotly
+pyarrow
+scikit-learn
+```
 ---
 
 ## 📁 **Data Sources**
 
 - FBI Hate Crime Master Files (2021–2024) — NIBRS dataset  
-- State population Excel (2021–2024)  
+- State population (2021–2024) - U.S. Census Bureau, Population Division
 - U.S. Territories population (2021-2024)
 
 ---
 
-## 🏁 **Status**
+# 👥 Authors
 
-✔ Data fully cleaned and validated  
-✔ Enriched dataset completed  
-✔ Visual storytelling completed 
-✔ Ready for presentation & GitHub submission  
+**Group 5 – Data Preparation & Visualization**
+
+---
