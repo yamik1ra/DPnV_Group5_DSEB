@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from collections import Counter
 from itertools import combinations
+import textwrap
 
 def analyze_incident_trend(df: pd.DataFrame):
     """
@@ -140,7 +141,7 @@ def analyze_geographic_trend(df: pd.DataFrame):
         axes[0].barh(range(len(regional_sorted)), regional_sorted.values, 
                      color=plt.cm.Oranges(np.linspace(0.9, 0.4, len(regional_sorted))))
         axes[0].set_yticks(range(len(regional_sorted)))
-        axes[0].set_yticklabels(regional_sorted.index, fontsize=11)
+        axes[0].set_yticklabels(regional_sorted.index, fontsize=12)
         axes[0].set_xlabel('Number of Unique Incidents', fontsize=12, fontweight='bold')
         axes[0].set_title('Hate Crimes by Region (Unique Incidents)', fontsize=13, fontweight='bold')
         axes[0].invert_yaxis()
@@ -150,15 +151,15 @@ def analyze_geographic_trend(df: pd.DataFrame):
         for i, (region, count) in enumerate(regional_sorted.items()):
             pct = count / regional_sum * 100
             axes[0].text(count + regional_sorted.max() * 0.05, i, f'{count:,} ({pct:.1f}%)', 
-                         va='center', fontweight='bold', fontsize=10)
+                         va='center', fontweight='bold', fontsize=12)
     else:
         axes[0].text(0.5, 0.5, 'Region data not available\nin processed dataset', 
                      ha='center', va='center', transform=axes[0].transAxes, fontsize=12)
-        axes[0].set_title('Regional Analysis (Data Unavailable)', fontsize=13, fontweight='bold')
+        axes[0].set_title('Regional Analysis (Data Unavailable)', fontsize=14, fontweight='bold')
 
 
     # Top 15 States
-    top_states = count_unique_incidents('state_name').head(15)
+    top_states = count_unique_incidents('state_name').head(5)
 
     if not top_states.empty:
         # Sort ascending for cleaner horizontal bar chart presentation
@@ -168,17 +169,19 @@ def analyze_geographic_trend(df: pd.DataFrame):
         axes[1].barh(range(len(top_states_sorted)), top_states_sorted.values, 
                      color=plt.cm.Oranges(np.linspace(0.9, 0.4, len(top_states_sorted))))
         axes[1].set_yticks(range(len(top_states_sorted)))
-        axes[1].set_yticklabels(top_states_sorted.index, fontsize=10)
+        axes[1].set_yticklabels(top_states_sorted.index, fontsize=13)
         axes[1].set_xlabel('Number of Unique Incidents', fontsize=12, fontweight='bold')
-        axes[1].set_title('Top 15 States by Unique Hate Crime Incidents', fontsize=13, fontweight='bold')
+        axes[1].set_title('Top 5 States by Unique Hate Crime Incidents', fontsize=13, fontweight='bold')
         axes[1].invert_yaxis()
+        axes[1].set_xlim(0, top_states_sorted.max() * 1.3)
         
         for i, (state, count) in enumerate(top_states_sorted.items()):
-            axes[1].text(count + top_states_sorted.max() * 0.03, i, f'{count:,}', va='center', fontsize=9, fontweight='bold')
+            axes[1].text(count + top_states_sorted.max() * 0.03, i, f'{count:,}', va='center', fontsize=13
+            , fontweight='bold')
     else:
         axes[1].text(0.5, 0.5, 'State data not available\nin processed dataset', 
-                     ha='center', va='center', transform=axes[1].transAxes, fontsize=12)
-        axes[1].set_title('State Analysis (Data Unavailable)', fontsize=13, fontweight='bold')
+                     ha='center', va='center', transform=axes[1].transAxes, fontsize=14)
+        axes[1].set_title('State Analysis (Data Unavailable)', fontsize=14, fontweight='bold')
 
 
     plt.tight_layout()
@@ -262,35 +265,35 @@ def analyze_population_rate(df: pd.DataFrame):
     fig, axes = plt.subplots(1, 2, figsize=(18, 7))
 
     # Get Top 10 lists
-    top10_count = state_pop_data.nlargest(10, 'incidents').sort_values('incidents', ascending=True)
-    top10_rate = state_pop_data.nlargest(10, 'incidents_per_100k').sort_values('incidents_per_100k', ascending=True)
+    top10_count = state_pop_data.nlargest(5, 'incidents').sort_values('incidents', ascending=True)
+    top10_rate = state_pop_data.nlargest(5, 'incidents_per_100k').sort_values('incidents_per_100k', ascending=True)
 
     # --- CHART 1: RAW INCIDENT COUNT ---
     axes[0].barh(range(len(top10_count)), top10_count['incidents'].values,
                  color=plt.cm.Blues(np.linspace(0.4, 0.9, len(top10_count))))
     axes[0].set_yticks(range(len(top10_count)))
-    axes[0].set_yticklabels(top10_count['state_name'], fontsize=12)
-    axes[0].set_xlabel('Total Unique Incidents', fontweight='bold', fontsize=11)
-    axes[0].set_title('Top 10 States: Raw Incident Count (Unique)', fontsize=13, fontweight='bold')
+    axes[0].set_yticklabels(top10_count['state_name'], fontsize=14)
+    axes[0].set_xlabel('Total Unique Incidents', fontweight='bold', fontsize=14)
+    axes[0].set_title('Top 5 States: Raw Incident Count (Unique)', fontsize=13, fontweight='bold')
     axes[0].set_xlim(0, top10_count['incidents'].max() * 1.2)
     
     for i, v in enumerate(top10_count['incidents'].values):
         is_max = (v == top10_count['incidents'].max())
-        axes[0].text(v + top10_count['incidents'].max() * 0.02, i, f'{v:,.0f}', va='center', fontsize=10, 
+        axes[0].text(v + top10_count['incidents'].max() * 0.02, i, f'{v:,.0f}', va='center', fontsize=13, 
                      fontweight='bold' if is_max else 'normal', color=plt.cm.Blues(0.9) if is_max else 'black')
 
     # --- CHART 2: PER CAPITA RATE (Incidents per 100k) ---
     axes[1].barh(range(len(top10_rate)), top10_rate['incidents_per_100k'].values,
                  color=plt.cm.Oranges(np.linspace(0.4, 0.9, len(top10_rate))))
     axes[1].set_yticks(range(len(top10_rate)))
-    axes[1].set_yticklabels(top10_rate['state_name'], fontsize=12)
-    axes[1].set_xlabel('Incidents per 100,000 Population', fontweight='bold', fontsize=11)
-    axes[1].set_title('Top 10 States: Population-Adjusted Rate', fontsize=13, fontweight='bold')
+    axes[1].set_yticklabels(top10_rate['state_name'], fontsize=14)
+    axes[1].set_xlabel('Incidents per 100,000 Population', fontweight='bold', fontsize=14)
+    axes[1].set_title('Top 5 States: Population-Adjusted Rate', fontsize=13, fontweight='bold')
     axes[1].set_xlim(0, top10_rate['incidents_per_100k'].max() * 1.2)
     
     for i, v in enumerate(top10_rate['incidents_per_100k'].values):
         is_max = (v == top10_rate['incidents_per_100k'].max())
-        axes[1].text(v + top10_rate['incidents_per_100k'].max() * 0.02, i, f'{v:.1f}', va='center', fontsize=10, 
+        axes[1].text(v + top10_rate['incidents_per_100k'].max() * 0.02, i, f'{v:.1f}', va='center', fontsize=13, 
                      fontweight='bold' if is_max else 'normal', color=plt.cm.Oranges(0.9) if is_max else 'black')
 
     plt.tight_layout()
@@ -481,7 +484,7 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
     
     Includes hierarchical x-axis labeling for Cities, MSA Counties, and Non-MSA Counties.
     """
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 1. Data Aggregation (Unique Incidents)
     # -------------------------------------------------------------------------
 
@@ -502,7 +505,7 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
         values='incidents'
     ).fillna(0)
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 2. Sort Columns Logic (Critical for Hierarchical Labels)
     # -------------------------------------------------------------------------
     # Define the desired column order groups
@@ -521,7 +524,7 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
     # Reindex the pivot table to enforce this order
     pivot_table = pivot_table.reindex(columns=final_order)
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 3. Plotting
     # -------------------------------------------------------------------------
     fig, ax = plt.subplots(figsize=(16, 8))
@@ -532,9 +535,9 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
     # Titles and basic labels
     ax.set_title('Heatmap of Unique Incidents by Region and Population Group', fontsize=16, fontweight='bold', pad=45)
     ax.set_xlabel('')  # Remove default xlabel
-    ax.set_ylabel('Country Region', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Country Region', fontsize=15, fontweight='bold')
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 4. Hierarchical Axis Labeling
     # -------------------------------------------------------------------------
     # Extract just the population ranges (removing "Cities: ", "MSA Counties: ", etc.)
@@ -545,9 +548,23 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
         else:
             pop_ranges.append(col) # Fallback if format is different
 
+    # Abbreviate population ranges
+    def abbreviate_pop(pop_str):
+        pop_str = pop_str.replace('1,000,000+', '1M+')
+        pop_str = pop_str.replace('500,000-999,999', '500K-999K')
+        pop_str = pop_str.replace('100,000-499,999', '100K-499K')
+        pop_str = pop_str.replace('50,000-99,999', '50K-99K')
+        pop_str = pop_str.replace('10,000-49,999', '10K-49K')
+        pop_str = pop_str.replace('under 10,000', 'under 10K')
+        pop_str = pop_str.replace('100,000+', '100K+')
+        pop_str = pop_str.replace('10,000-99,999', '10K-99K')
+        return pop_str
+    
+    pop_ranges = [abbreviate_pop(p) for p in pop_ranges]
+
     # Set bottom ticks (Population Ranges)
     ax.set_xticks(np.arange(len(pop_ranges)) + 0.5)
-    ax.set_xticklabels(pop_ranges, rotation=45, ha='right', fontsize=9)
+    ax.set_xticklabels(pop_ranges, rotation=0, ha='center', fontsize=14)
 
     # Calculate positions for the top-level group labels (Cities, MSA, Non-MSA)
     # We count how many columns from each group actually exist in the final table
@@ -560,7 +577,7 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
     # Add "Cities" label and separator if cities exist
     if n_cities > 0:
         center = current_pos + n_cities / 2
-        ax.text(center, -0.2, 'Cities', ha='center', va='top', fontsize=13, fontweight='bold',
+        ax.text(center, -0.1, 'Cities', ha='center', va='top', fontsize=14, fontweight='bold',
                 transform=ax.get_xaxis_transform())
         current_pos += n_cities
         # Draw separator
@@ -570,7 +587,7 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
     # Add "MSA Counties" label and separator if MSAs exist
     if n_msa > 0:
         center = current_pos + n_msa / 2
-        ax.text(center, -0.2, 'MSA Counties', ha='center', va='top', fontsize=13, fontweight='bold',
+        ax.text(center, -0.1, 'MSA Counties', ha='center', va='top', fontsize=14, fontweight='bold',
                 transform=ax.get_xaxis_transform())
         current_pos += n_msa
         # Draw separator
@@ -580,7 +597,7 @@ def plot_region_pop_heatmap(df: pd.DataFrame):
     # Add "Non-MSA Counties" label
     if n_non_msa > 0:
         center = current_pos + n_non_msa / 2
-        ax.text(center, -0.2, 'Non-MSA Counties', ha='center', va='top', fontsize=13, fontweight='bold',
+        ax.text(center, -0.1, 'Non-MSA Counties', ha='center', va='top', fontsize=14, fontweight='bold',
                 transform=ax.get_xaxis_transform())
 
     plt.tight_layout()
@@ -598,7 +615,9 @@ def plot_top_offenses(df: pd.DataFrame):
     Plots a horizontal bar chart of the Top 15 most common offenses.
     
     """
-    # -------------------------------------------------------------------------
+    import textwrap  # Added import for text wrapping
+    
+    # ------------------------------------------------------------------------- 
     # 1. Data Preparation
     # -------------------------------------------------------------------------
     if 'offense' not in df.columns:
@@ -607,13 +626,13 @@ def plot_top_offenses(df: pd.DataFrame):
 
     # Count frequencies directly from the single 'offense' column
     # This automatically includes offenses from all slots (1-10)
-    top_offenses = df['offense'].value_counts().head(15)
+    top_offenses = df['offense'].value_counts().head(8)
     
     # Calculate totals for percentage
     total_offenses_count = len(df)
     unique_offenses_count = df['offense'].nunique()
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 2. Plotting
     # -------------------------------------------------------------------------
     plt.figure(figsize=(14, 8))
@@ -623,16 +642,20 @@ def plot_top_offenses(df: pd.DataFrame):
     colors = plt.cm.Oranges(np.linspace(0.9, 0.4, len(top_offenses)))
     bars = plt.barh(range(len(top_offenses)), top_offenses.values, color=colors)
     
+    # Wrap y-axis labels if too long (wrap at 20 characters)
+    wrapped_labels = [textwrap.fill(label, width=19) for label in top_offenses.index]
+    
     # Styling
-    plt.yticks(range(len(top_offenses)), top_offenses.index, fontsize=11)
+    plt.yticks(range(len(top_offenses)), wrapped_labels, fontsize=13)
     plt.xlabel('Number of Offense Instances', fontsize=12, fontweight='bold')
-    plt.title('Top 15 Most Common Offenses in US Hate Crimes', fontsize=16, fontweight='bold', pad=20)
+    plt.title('Top 8 Most Common Offenses in US Hate Crimes', fontsize=16, fontweight='bold', pad=20)
+    plt.xlim(0, top_offenses.max() * 1.1)
     plt.gca().invert_yaxis()  # Highest at top
 
     # Add value labels
     x_offset = top_offenses.max() * 0.01
     for i, v in enumerate(top_offenses.values):
-        plt.text(v + x_offset, i, f'{v:,}', va='center', fontsize=10, fontweight='bold')
+        plt.text(v + x_offset, i, f'{v:,}', va='center', fontsize=13, fontweight='bold')
 
     plt.grid(axis='x', alpha=0.3)
     plt.tight_layout()
@@ -640,7 +663,7 @@ def plot_top_offenses(df: pd.DataFrame):
     # Show plot (if running in notebook) or just return figure if needed
     plt.show()
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 3. Summary Output
     # -------------------------------------------------------------------------
     print("\n📊 TOP OFFENSES IN US HATE CRIMES:")
@@ -665,7 +688,7 @@ def plot_offense_severity(df: pd.DataFrame):
     1. Box Plot: Primary Offense vs Total Victims
     2. Heatmap: Likelihood of having a Secondary Offense given the Primary Offense
     """
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 1. Data Preparation (Reconstructing Incident-Level Logic)
     # -------------------------------------------------------------------------
     if 'offense_index' not in df.columns:
@@ -711,6 +734,10 @@ def plot_offense_severity(df: pd.DataFrame):
         order=top_primary_offenses
     )
     
+    # Wrap y-tick labels
+    wrapped_labels = [textwrap.fill(label, width=19) for label in top_primary_offenses]
+    axes[0].set_yticklabels(wrapped_labels, fontsize=13)
+    
     axes[0].set_title('Victim Impact by Primary Offense Type (Top 10)', fontsize=14, fontweight='bold')
     axes[0].set_xlabel('Number of Victims per Incident', fontsize=12, fontweight='bold')
     axes[0].set_ylabel('Primary Offense', fontsize=12, fontweight='bold')
@@ -737,6 +764,9 @@ def plot_offense_severity(df: pd.DataFrame):
         cbar_kws={'label': '% of Incidents with Secondary Offense'}, 
         ax=axes[1]
     )
+    
+    # Wrap y-tick labels for heatmap
+    axes[1].set_yticklabels(wrapped_labels,fontsize=13)
     
     axes[1].set_title('Complexity Analysis: % of Incidents involving Multiple Offenses (Top 10)', 
                      fontsize=14, fontweight='bold')
@@ -779,7 +809,7 @@ def plot_secondary_escalation(df: pd.DataFrame):
     Reconstructs the relationship between Primary (Index=1) and Secondary (Index>1)
     offenses using incident_number.
     """
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------- 
     # 1. Data Preparation (Linking Primary to Secondary)
     # -------------------------------------------------------------------------
 
@@ -844,7 +874,9 @@ def plot_secondary_escalation(df: pd.DataFrame):
             axes[i].barh(range(len(top_secondary)), top_secondary.values, color=colors)
             
             axes[i].set_yticks(range(len(top_secondary)))
-            axes[i].set_yticklabels(top_secondary.index, fontsize=10)
+            # Wrap text for y-ticks
+            wrapped_labels = [textwrap.fill(label, width=19) for label in top_secondary.index]
+            axes[i].set_yticklabels(wrapped_labels, fontsize=13)
             axes[i].set_title(f'Secondary Offenses Following\n{primary}', fontsize=12, fontweight='bold')
             axes[i].set_xlabel('Number of Incidents')
             axes[i].invert_yaxis()
@@ -853,7 +885,7 @@ def plot_secondary_escalation(df: pd.DataFrame):
             # Add labels (Count + %)
             for j, (offense, count) in enumerate(top_secondary.items()):
                 pct = (count / total_secondary_count) * 100
-                axes[i].text(count + 1, j, f'{count} ({pct:.1f}%)', va='center', fontsize=9, fontweight='bold')
+                axes[i].text(count + 1, j, f'{count} ({pct:.1f}%)', va='center', fontsize=13, fontweight='bold')
         else:
             axes[i].text(0.5, 0.5, 'No Secondary Offenses Found', ha='center', va='center')
             axes[i].set_title(f'{primary}', fontsize=12)
@@ -932,7 +964,7 @@ def plot_top_bias_categories(df: pd.DataFrame):
     colors = plt.cm.Oranges(np.linspace(0.9, 0.4, len(top_bias)))
     
     bars = plt.barh(range(len(top_bias)), top_bias.values, color=colors)
-    plt.yticks(range(len(top_bias)), [cat[:40] for cat in top_bias.index], fontsize=11)
+    plt.yticks(range(len(top_bias)), [cat[:40] for cat in top_bias.index], fontsize=13)
     plt.xlabel('Number of Offense Instances', fontsize=12, fontweight='bold')
     plt.title('Top 10 Bias Categories in US Hate Crimes', fontsize=16, fontweight='bold', pad=20)
     plt.xlim(0, top_bias.max() * 1.15)
@@ -940,7 +972,7 @@ def plot_top_bias_categories(df: pd.DataFrame):
 
     # Add Value Labels
     for i, v in enumerate(top_bias.values):
-        plt.text(v + (top_bias.max() * 0.01), i, f'{v:,}', va='center', fontsize=10, fontweight='bold')
+        plt.text(v + (top_bias.max() * 0.01), i, f'{v:,}', va='center', fontsize=13, fontweight='bold')
 
     plt.grid(axis='x', alpha=0.3)
     plt.tight_layout()
@@ -963,7 +995,7 @@ def plot_top_bias_categories(df: pd.DataFrame):
 
 def plot_top_bias_motivations(df: pd.DataFrame):
     """
-    Aggregates and plots the Top 15 Specific Bias Motivations.
+    Aggregates and plots the Top 10 Specific Bias Motivations.
     Dynamically finds columns like bias_motivation_a, bias_motivation_b, etc.
     """
     print("🎯 TOP BIAS MOTIVATION ANALYSIS:")
@@ -988,22 +1020,22 @@ def plot_top_bias_motivations(df: pd.DataFrame):
 
     # 3. Frequency Count
     motivation_counts = all_bias_motivations.value_counts()
-    top_bias_motivations = motivation_counts.head(15)
+    top_bias_motivations = motivation_counts.head(10)
     
     # 4. Visualization
     plt.figure(figsize=(14, 10))
     colors = plt.cm.Oranges(np.linspace(0.9, 0.4, len(top_bias_motivations)))
     
     plt.barh(range(len(top_bias_motivations)), top_bias_motivations.values, color=colors)
-    plt.yticks(range(len(top_bias_motivations)), [mot[:40] for mot in top_bias_motivations.index], fontsize=11)
+    plt.yticks(range(len(top_bias_motivations)), [mot[:40] for mot in top_bias_motivations.index], fontsize=13)
     plt.xlabel('Number of Incidents', fontsize=12, fontweight='bold')
-    plt.title('Top 15 Specific Bias Motivations in US Hate Crimes', fontsize=16, fontweight='bold')
+    plt.title('Top 10 Specific Bias Motivations in US Hate Crimes', fontsize=16, fontweight='bold')
     plt.xlim(0, top_bias_motivations.max() * 1.1)
     plt.gca().invert_yaxis()  # Highest at top
 
     # Add Value Labels
     for i, v in enumerate(top_bias_motivations.values):
-        plt.text(v + (top_bias_motivations.max() * 0.01), i, f'{v:,}', va='center', fontsize=10, fontweight='bold')
+        plt.text(v + (top_bias_motivations.max() * 0.01), i, f'{v:,}', va='center', fontsize=13, fontweight='bold')
 
     plt.grid(axis='x', alpha=0.3)
     plt.tight_layout()
@@ -1112,7 +1144,7 @@ def plot_high_severity_motivations(df: pd.DataFrame):
     bars = ax.barh(range(len(severity_df)), severity_df['High_Severity_Pct'], color=colors)
     
     ax.set_yticks(range(len(severity_df)))
-    ax.set_yticklabels([m[:30] for m in severity_df['Motivation']], fontsize=11)
+    ax.set_yticklabels([m[:30] for m in severity_df['Motivation']], fontsize=13)
     ax.set_xlabel('Percentage of Incidents classified as "High Severity" (%)', fontsize=12, fontweight='bold')
     ax.set_title('Which Hate Motivations are Most Violent?\n(High Severity Rate among Top 15 Motivations)', 
                 fontsize=15, fontweight='bold', pad=20)
@@ -1121,7 +1153,7 @@ def plot_high_severity_motivations(df: pd.DataFrame):
 
     # Add Percentage Labels
     for i, pct in enumerate(severity_df['High_Severity_Pct']):
-        ax.text(pct + 0.5, i, f'{pct:.1f}%', va='center', fontsize=10, fontweight='bold')
+        ax.text(pct + 0.5, i, f'{pct:.1f}%', va='center', fontsize=13, fontweight='bold')
 
     plt.tight_layout()
     plt.show()
@@ -1529,10 +1561,10 @@ def plot_bias_motivations_by_region(df: pd.DataFrame):
     )
 
     plt.title('Regional Distribution of Top 8 Bias Motivations (%)', fontsize=16, fontweight='bold')
-    plt.xlabel('Region', fontsize=12, fontweight='bold')
+    plt.xlabel('Region', fontsize=13, fontweight='bold')
     plt.ylabel('Percentage of Regional Incidents', fontsize=12, fontweight='bold')
     plt.legend(title='Bias Motivation', bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.xticks(rotation=45, ha='right')
+    plt.xticks(rotation=0, ha='center')
     plt.grid(axis='y', alpha=0.3)
     plt.tight_layout()
     plt.show()
@@ -1616,13 +1648,13 @@ def plot_top_locations(df: pd.DataFrame):
     # Count frequencies
     location_counts = unique_locations_df['location'].value_counts()
     
-    # Top 15 Locations
-    top_locations = location_counts.head(15)
+    # Top 10 Locations
+    top_locations = location_counts.head(10)
     
     # -------------------------------------------------------------------------
     # 2. Visualization 1: Horizontal Bar Chart (Top 15)
     # -------------------------------------------------------------------------
-    print("\n📊 TOP 15 LOCATIONS FOR HATE CRIMES:")
+    print("\n📊 TOP 10 LOCATIONS FOR HATE CRIMES:")
     print("="*60)
     print(f"{'Rank':<4} {'Location':<35} {'Count':<8} {'Percentage'}")
     print("-" * 60)
@@ -1637,7 +1669,7 @@ def plot_top_locations(df: pd.DataFrame):
     plt.barh(range(len(top_locations)), top_locations.values, color=colors)
     plt.yticks(range(len(top_locations)), 
                [loc[:30] + '...' if len(loc) > 30 else loc for loc in top_locations.index], 
-               fontsize=11)
+               fontsize=13)
     
     plt.xlabel('Number of Unique Incidents', fontsize=12, fontweight='bold')
     plt.ylabel('Location', fontsize=12, fontweight='bold')
@@ -1647,7 +1679,7 @@ def plot_top_locations(df: pd.DataFrame):
     # Add value labels
     for i, v in enumerate(top_locations.values):
         pct = (v / total_location_instances) * 100
-        plt.text(v + (top_locations.max() * 0.01), i, f'{v:,} ({pct:.1f}%)', va='center', fontsize=9, fontweight='bold')
+        plt.text(v + (top_locations.max() * 0.01), i, f'{v:,} ({pct:.1f}%)', va='center', fontsize=13, fontweight='bold')
 
     plt.grid(axis='x', alpha=0.3)
     plt.tight_layout()
@@ -1671,7 +1703,7 @@ def plot_top_locations(df: pd.DataFrame):
     pie_colors = plt.cm.Oranges(np.linspace(0, 0.8, len(pie_labels))) # Darker oranges
     
     plt.pie(pie_counts, labels=pie_labels, autopct='%1.1f%%', startangle=90, 
-            colors=pie_colors, pctdistance=0.85, textprops={'fontsize': 10})
+            colors=pie_colors, pctdistance=0.85, textprops={'fontsize': 13})
             
     plt.title('Distribution of Hate Crime Locations (Top 8 + Other)', fontsize=16, fontweight='bold')
     plt.axis('equal')
@@ -1717,12 +1749,12 @@ def plot_top_locations(df: pd.DataFrame):
     cat_vals = [x[1] for x in sorted_cats]
     
     plt.bar(cat_names, cat_vals, color=plt.cm.Oranges(np.linspace(0.8, 0.3, len(cat_names))))
-    plt.xticks(rotation=45, ha='right')
+    plt.xticks(rotation=0, ha='center', fontsize=13)
     plt.ylabel('Number of Unique Incidents', fontsize=12, fontweight='bold')
     plt.title('Hate Crime Incidents by Location Category', fontsize=16, fontweight='bold')
     
     for i, v in enumerate(cat_vals):
-        plt.text(i, v + (max(cat_vals)*0.01), f'{v:,}', ha='center', va='bottom', fontsize=10)
+        plt.text(i, v + (max(cat_vals)*0.01), f'{v:,}', ha='center', va='bottom', fontsize=13)
 
     plt.grid(axis='y', alpha=0.3)
     plt.tight_layout()
@@ -1790,7 +1822,7 @@ def plot_bias_location_heatmap(df: pd.DataFrame):
     top_biases = incident_pairs['Bias_Category'].value_counts().head(8).index.tolist()
     
     # Get Top 15 Locations (by total incident count)
-    top_locations = incident_pairs['location'].value_counts().head(15).index.tolist()
+    top_locations = incident_pairs['location'].value_counts().head(10).index.tolist()
 
     # Filter data
     filtered_pairs = incident_pairs[
@@ -1817,9 +1849,9 @@ def plot_bias_location_heatmap(df: pd.DataFrame):
     sns.heatmap(crosstab, annot=True, fmt='d', cmap='Oranges',
                 cbar_kws={'label': 'Number of Unique Incidents'}, square=False)
     
-    plt.title('Top Bias Categories by Location (Top 15 Locations)', fontsize=16, fontweight='bold')
-    plt.xticks(rotation=45, ha='right')
-    plt.yticks(rotation=0)
+    plt.title('Top Bias Categories by Location (Top 10 Locations)', fontsize=16, fontweight='bold')
+    plt.xticks(rotation=0, ha='center', fontsize=13)
+    plt.yticks(rotation=0, fontsize=13)
     plt.tight_layout()
     plt.show()
 
@@ -1859,8 +1891,8 @@ def plot_bias_location_heatmap(df: pd.DataFrame):
                        color=plt.cm.Oranges(np.linspace(0.9, 0.4, len(all_top_locs))), width=0.8)
 
     plt.title('Top 5 Locations for Each Bias Category (%)', fontsize=16, fontweight='bold')
-    plt.xlabel('Percentage of Incidents', fontsize=12, fontweight='bold')
-    plt.ylabel('Bias Category', fontsize=12, fontweight='bold')
+    plt.xlabel('Percentage of Incidents', fontsize=13, fontweight='bold')
+    plt.ylabel('Bias Category', fontsize=13, fontweight='bold')
     plt.legend(title='Location', bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(axis='x', alpha=0.3)
     plt.tight_layout()
@@ -2018,7 +2050,7 @@ def plot_location_severity_risk(df: pd.DataFrame):
 
     plt.yticks(y_pos, [loc[:30] for loc in locations], fontsize=11)
     plt.xlabel('Percentage of Incidents (%)', fontsize=12, fontweight='bold')
-    plt.ylabel('Location', fontsize=12, fontweight='bold')
+    plt.ylabel('Location', fontsize=13, fontweight='bold')
     plt.title('Risk Assessment: Severity Distribution by Location (Top 10)', fontsize=16, fontweight='bold', pad=20)
     plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=3, fontsize=11)
     plt.grid(axis='x', alpha=0.3)
@@ -2291,33 +2323,22 @@ def plot_offender_demographics(df: pd.DataFrame):
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
     fig.suptitle('Offender Demographics in US Hate Crimes', fontsize=16, fontweight='bold')
 
-    # Plot 1: Race Distribution (Bar)
-    race_data = race_counts.head(8)
-    axes[1, 0].bar(range(len(race_data)), race_data.values, color=plt.cm.Oranges(np.linspace(1, 0, len(race_data))))
-    axes[1, 0].set_xticks(range(len(race_data)))
-    axes[1, 0].set_xticklabels([r[:20] for r in race_data.index], rotation=45, ha='right')
-    axes[1, 0].set_ylabel('Number of Incidents', fontsize=12, fontweight='bold')
-    axes[1, 0].set_title('Offender Race Distribution', fontsize=14, fontweight='bold')
+    # Plot 1: Race Distribution (Bar) - Extended to span both columns in row 1
+    race_data = race_counts[race_counts.index != 'Unknown'].head(8)
+    axes[0, 0].remove()
+    axes[0, 1].remove()
+    ax_race = plt.subplot(2, 2, (1, 2))
+    ax_race.bar(range(len(race_data)), race_data.values, color=plt.cm.Oranges(np.linspace(1, 0, len(race_data))))
+    ax_race.set_xticks(range(len(race_data)))
+    ax_race.set_xticklabels([r[:20] for r in race_data.index], rotation=45, ha='right', fontsize=13)
+    ax_race.set_ylabel('Number of Incidents', fontsize=12, fontweight='bold')
+    ax_race.set_title('Offender Race Distribution (Excluding Unknown)', fontsize=14, fontweight='bold')
+    ax_race.set_ylim(0, race_data.max() * 1.1)
     
     for i, count in enumerate(race_data.values):
-        axes[1, 0].text(i, count + (race_data.max()*0.02), f'{count:,}', ha='center', va='bottom', fontsize=9, fontweight='bold')
-
-    # Plot 2: Ethnicity (Pie)
-    if not ethnicity_counts.empty:
-        # Use a localized palette
-        axes[0, 1].pie(ethnicity_counts.values, labels=ethnicity_counts.index, autopct='%1.1f%%',
-                       colors=sns.color_palette("Oranges", n_colors=len(ethnicity_counts)), startangle=90)
-        axes[0, 1].set_title('Offender Ethnicity Distribution', fontsize=14, fontweight='bold')
-
-    # Plot 3: Adult vs Juvenile (Pie)
-    if total_offenders > 0:
-        sizes = [adult_offenders, juvenile_offenders]
-        labels = ['Adult', 'Juvenile']
-        colors = ['#e6550d', '#fdae6b'] # Dark orange, light orange
-        axes[0, 0].pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90, explode=(0, 0.1))
-        axes[0, 0].set_title('Adult vs Juvenile Offenders', fontsize=14, fontweight='bold')
-
-    # Plot 4: Juvenile Rates by Region (Bar)
+        ax_race.text(i, count + (race_data.max()*0.02), f'{count:,}', ha='center', va='bottom', fontsize=13, fontweight='bold')
+    
+    # Plot 2: Juvenile Rates by Region (Bar) - Moved to axes[1, 0]
     # Calculate regional stats on incident_df
     region_stats = incident_df.groupby('country_region').agg({
         'num_adult_offenders': 'sum',
@@ -2334,15 +2355,24 @@ def plot_offender_demographics(df: pd.DataFrame):
     region_stats = region_stats[region_stats['total'] > 0]
 
     if not region_stats.empty:
-        bars = axes[1, 1].bar(range(len(region_stats)), region_stats['juvenile_rate'],
-                              color=plt.cm.Oranges(np.linspace(0.9, 0.4, len(region_stats))))
-        axes[1, 1].set_xticks(range(len(region_stats)))
-        axes[1, 1].set_xticklabels(region_stats['country_region'], rotation=45, ha='right')
-        axes[1, 1].set_ylabel('Juvenile Offender Rate (%)', fontsize=12, fontweight='bold')
-        axes[1, 1].set_title('Juvenile Offender Rates by Region', fontsize=14, fontweight='bold')
+        axes[1, 0].bar(range(len(region_stats)), region_stats['juvenile_rate'],
+                       color=plt.cm.Oranges(np.linspace(0.9, 0.4, len(region_stats))))
+        axes[1, 0].set_xticks(range(len(region_stats)))
+        axes[1, 0].set_xticklabels(region_stats['country_region'], rotation=0, ha='center', fontsize=13)
+        axes[1, 0].set_ylabel('Juvenile Offender Rate (%)', fontsize=12, fontweight='bold')
+        axes[1, 0].set_title('Juvenile Offender Rates by Region', fontsize=14, fontweight='bold')
+        axes[1, 0].set_ylim(0, region_stats['juvenile_rate'].max() * 1.1)
         
         for i, rate in enumerate(region_stats['juvenile_rate']):
-            axes[1, 1].text(i, rate + 0.5, f'{rate:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            axes[1, 0].text(i, rate + 0.5, f'{rate:.1f}%', ha='center', va='bottom', fontsize=13, fontweight='bold')
+
+    # Plot 3: Adult vs Juvenile (Pie) - Moved to axes[1, 1]
+    if total_offenders > 0:
+        sizes = [adult_offenders, juvenile_offenders]
+        labels = ['Adult', 'Juvenile']
+        colors = ['#e6550d', '#fdae6b'] # Dark orange, light orange
+        axes[1, 1].pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90, explode=(0, 0.1), textprops={'fontsize': 13, 'fontweight': 'bold'})
+        axes[1, 1].set_title('Adult vs Juvenile Offenders', fontsize=14, fontweight='bold')
 
     plt.tight_layout()
     plt.show()
