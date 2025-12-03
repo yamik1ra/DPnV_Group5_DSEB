@@ -261,8 +261,10 @@ python src/main.py
 | **Metric**          | **Dirty Model** | **Clean Model** | **Impact** |
 |---------------------|-----------------|------------------|------------|
 | Accuracy            | 0.56            | 0.65             | +9% improvement in overall correctness |
-| Macro F1-Score      | 0.36            | 0.61             | +25 points indicating more balanced learning |
-| Class 0 Precision   | 0.00            | 0.66             | Fixed “model collapse” — dirty model failed to identify any Class 0 instances |
+| Macro F1-Score      | 0.36            | 0.62             | +26 points indicating more balanced learning |
+| Class 0 Precision   | 0.00            | 0.67             | Fixed “model collapse” — dirty model failed to identify any Class 0 instances |
+| ROC AU   | 0.45  | 0.69  | Clean model can actually rank classes correctly |
+| PR AU    | 0.53  | 0.72  | Big improvement in precision-recall tradeoff |
 
 
 **Critical Insight:** The "Dirty" model suffered from **model collapse**, predicting the majority class (Class 1) for every single instance. The data cleaning and unpivoting process recovered the signal necessary for the model to distinguish between bias types effectively.
