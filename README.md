@@ -322,12 +322,13 @@ scikit-learn
 # 👥 Authors
 
 **Group 5 – Data Preparation & Visualization**
-| ID  | Name                | Contribution (%) |
-|-----|---------------------|------------------|
-| 11230527  | Đỗ Tuấn Đạt          | 22%       |
-| 11230531  | Trần Minh Đức        | 18%       |
-| 11230552  | Đỗ Hữu Kiên          | 20%       |
-| 11230577  | Tô Bích Ngọc         | 22%       |
-| 11230580  | Nguyễn Tuấn Phong    | 18%       |
+
+| No. | ID        | Full Name            | Contribution (%) |
+|-----|-----------|----------------------|------------------|
+| 1   | 11230527  | Đỗ Tuấn Đạt          | 22%              |
+| 2   | 11230577  | Tô Bích Ngọc         | 22%              |
+| 3   | 11230552  | Đỗ Hữu Kiên          | 20%              |
+| 4   | 11230531  | Trần Minh Đức        | 18%              |
+| 5   | 11230580  | Nguyễn Tuấn Phong    | 18%              |
 
 ---
